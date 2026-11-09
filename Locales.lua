@@ -813,3 +813,34 @@ local welcome = {
 	itIT = "%s %s caricato. Digita %s per le opzioni.",
 }
 for code, text in pairs(welcome) do locales[code].WELCOME = text end
+
+-- Setup guide (English first; translations once the layout is approved).
+local wizardText = {
+	enUS = {
+		WIZ_HELLO = "Welcome, %s!",
+		WIZ_WELCOME_TEXT = "Thanks for installing |cffffd200CS.Coder - Quest Indicator|r.\n\nA floating |cffffd200!|r marks every mob and item you still need for your quests, with your progress (8/12) right beside it.\n\nStart right away with the default settings, or take a minute to make it yours.",
+		WIZ_USE_DEFAULT = "Use default settings",
+		WIZ_CONFIGURE = "Configure",
+		WIZ_ICON_TITLE = "Pick your icon",
+		WIZ_ICON_TEXT = "This is how quest mobs and items will be marked. Click the icon to try others: the preview on the right shows the result right away.",
+		WIZ_FLOAT_TIP = "The icon gently bobs up and down.",
+		WIZ_GLOW_TIP = "A soft light behind the icon.",
+		WIZ_SHOW_TITLE = "What to show",
+		WIZ_SHOW_TEXT = "Choose what the addon marks for you.",
+		WIZ_MOBS_TIP = "An icon over every mob you still need for a quest.",
+		WIZ_ITEMS_TIP = "An icon over the nearest quest item in the world.",
+		WIZ_PLACE_TITLE = "Where it shows",
+		WIZ_PLACE_TEXT = "Pick the side of the nameplate the icon sits on, then fine-tune it with X and Y.",
+		WIZ_DONE_TITLE = "All set!",
+		WIZ_DONE_TEXT = "Your quest indicator is ready. Good hunting!\n\nType |cff00ff00/cqi|r or click the minimap button at any time for the full options: fonts, colors, profiles and much more.\n\nWant to see this guide again? Type |cff00ff00/cqi setup|r.",
+		WIZ_STEP = "Step %d of %d",
+		WIZ_BACK = "Back",
+		WIZ_NEXT = "Next",
+		WIZ_FINISH = "Finish",
+		WIZ_OPEN_OPTIONS = "Open full options",
+		WIZ_DEFAULT_DONE = "%s is using the default settings. Type %s at any time to change them.",
+	},
+}
+for code, keys in pairs(wizardText) do
+	for k, v in pairs(keys) do locales[code][k] = v end
+end

@@ -130,6 +130,8 @@ for _, f in ipairs(later) do if f._kind == "EditBox" then f._text = "Solo" end e
 clickAll(later, 1)
 try("slash", env.SlashCmdList.CSCODERQUESTINDICATOR, "toggle")
 try("slash open", env.SlashCmdList.CSCODERQUESTINDICATOR, "")
+try("slash setup", env.SlashCmdList.CSCODERQUESTINDICATOR, "setup")
+print("setup seen:", env.CSCoderQuestIndicatorDB.setupSeen["Tester - Realm"])
 
 -- /cqi plate on a fake target plate drawn at 0.8 distance scale: the saved size must be the
 -- close-range one (base scale 1, bar 100x10 at 10 from the top).

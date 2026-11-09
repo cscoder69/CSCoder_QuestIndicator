@@ -90,6 +90,18 @@ live in game after `/reload`.
   - Dropdowns are self-made (UIDropDownMenu differs/deprecated across clients).
   - Static texts go through `Loc(object, key)` so a language change relabels live.
 - **Minimap button:** left-click options, right-click toggles `active`, drag around the edge; grey when off.
+- **Setup guide** (`BuildWizard`, `ShowWizard`, `/cqi setup`): shown 3 s after login the first time on
+  a character (`root.setupSeen[charKey]`; chars from before it existed are marked seen on update).
+  Page 1 = logo (`icons/logo.tga`, made by `tools/make_logo_tga.ps1`), greeting, "Use default
+  settings" / "Configure". Configure = Icon, What to show, Where (anchor + X/Y), Done, each beside
+  its own live preview (`previews` list: `BuildPreview` can make several). Any close marks it seen.
+  Texts are English only until the user approves the layout.
+- **Icon anchor** (`anchor`, `objectAnchor`): top/bottom/left/right of the plate; side anchors use
+  the health bar (`PlateBar`). Changing it resets X/Y to that side's start.
+- **Lua 200-locals limit:** the main chunk is close to it (about 6 free on 2026-11-09). New helpers
+  go inside `do ... end` blocks (see the setup guide and the plate measuring code).
+- **Plates on WoW Forever are restricted:** GetTop/GetPoint error ("Can't measure restricted
+  regions"); size and scale can be read. `MeasurePlate` protects every read and estimates the bar.
 - `/cqi` opens the options, `/cqi toggle` toggles the addon.
 
 ## Local checks (run before every hand-off)
@@ -109,6 +121,8 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
 - GitHub: **cscoder69/CSCoder_QuestIndicator** (public, MIT). `gh` CLI at `C:\Program Files\GitHub CLI\gh.exe`, logged in as cscoder69.
 - CurseForge: project **1793185**, author CSCoder. Repo secret `CF_API_KEY` is set (CurseForge API token).
   Keep CurseForge's own "Automatic Packaging" **off** (the GitHub Action does it; both would double-upload).
+- **Version numbers (user, 2026-11-09):** bump only the third digit for now (v1.2.1, v1.2.2, ...);
+  the minor number was going up too fast.
 - Commits publish nothing. To release: bump nothing by hand, just
   `git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`, then `gh run watch` the "Package and release" run.
   New files go through CurseForge moderation.

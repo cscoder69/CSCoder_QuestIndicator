@@ -863,8 +863,16 @@ local function ResolveCharacter()
 end
 
 local function LoadSavedVariables()
+	local fresh = CSCoderQuestIndicatorDB == nil
 	CSCoderQuestIndicatorDB = CSCoderQuestIndicatorDB or {}
 	root = CSCoderQuestIndicatorDB
+	-- Characters that used the addon before the setup guide existed don't get it on update.
+	if not root.setupSeen then
+		root.setupSeen = {}
+		if not fresh then
+			for key in pairs(root.chars or {}) do root.setupSeen[key] = true end
+		end
+	end
 	if not root.profiles then
 		-- Up to version 4 the settings sat directly in the saved table: they become "Default".
 		local profile = {}
@@ -1171,6 +1179,7 @@ end
 local DROPDOWN_ROW = 18
 local DROPDOWN_MAX_ROWS = 16 -- longer lists wrap into more columns
 local openList -- the dropdown list currently open, if any
+local dropdownHost -- window that holds new dropdown lists (default: the options panel)
 
 local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, width, fontFor)
 	width = width or 240
@@ -1197,7 +1206,7 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, 
 
 	-- The list lives on the panel, not under the button: inside the scrolling page it would be
 	-- cut off at the bottom of the view.
-	local list = CreateFrame("Frame", nil, panel, backdrop)
+	local list = CreateFrame("Frame", nil, dropdownHost or panel, backdrop)
 	list:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, 2)
 	list:SetFrameStrata("FULLSCREEN_DIALOG")
 	if list.SetBackdrop then
@@ -1451,12 +1460,14 @@ local function AddIconPicker(parent, x, y)
 	return b
 end
 
--- Live preview, fixed on the right of the panel (it stays while the tabs change): a quest mob
--- with a fake nameplate on top, a quest item (crate) below, each with an icon that follows the
--- settings.
-local preview = {}
+-- Live preview: a quest mob with a fake nameplate on top, a quest item (crate) below, each with
+-- an icon that follows the settings. There can be several (the options' preview window and the
+-- setup guide); all of them follow every change.
+local previews = {}
 
 local function BuildPreview(pane)
+	local p = {}
+	previews[#previews + 1] = p
 	local heading = pane:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	heading:SetPoint("TOPLEFT", 2, 0)
 	Loc(heading, "PREVIEW")
@@ -1507,50 +1518,53 @@ local function BuildPreview(pane)
 	itemName:SetPoint("TOP", crate, "BOTTOM", 0, -2)
 	Loc(itemName, "PREVIEW_OBJECT")
 
-	preview.mob = CreateIcon()
-	preview.mob:SetParent(plate)
-	preview.mob.plate, preview.mob.isPreview, preview.mob.kind, preview.mob.progressValue = plate, true, "normal", "8/12"
-	preview.object = CreateIcon()
-	preview.object:SetParent(item)
-	preview.object.plate, preview.object.isPreview, preview.object.isObject, preview.object.kind = item, true, true, "normal"
-	preview.box, preview.plate, preview.bar = box, plate, bar
+	p.mob = CreateIcon()
+	p.mob:SetParent(plate)
+	p.mob.plate, p.mob.isPreview, p.mob.kind, p.mob.progressValue = plate, true, "normal", "8/12"
+	p.object = CreateIcon()
+	p.object:SetParent(item)
+	p.object.plate, p.object.isPreview, p.object.isObject, p.object.kind = item, true, true, "normal"
+	p.box, p.plate, p.bar = box, plate, bar
 	plate.previewBar = bar -- side anchors use the bar, as on real plates
 	box:SetScript("OnShow", function() UpdatePreview() end)
+	return p
 end
 
 -- The fake nameplate copies a real one measured in the world (size, scale, health bar), so what
 -- you set in the preview looks the same on real plates. previewRatio turns real plate units into
 -- preview units; the mob icon is scaled by it as well.
-local function ApplyPlateGeometry()
+local function ApplyPlateGeometry(p)
 	local geom, ratio = root and root.plateGeom, 1
-	if geom and geom.eff then ratio = geom.eff / preview.box:GetEffectiveScale() end
+	if geom and geom.eff then ratio = geom.eff / p.box:GetEffectiveScale() end
 	if geom then
-		preview.plate:SetSize(geom.w * ratio, geom.h * ratio)
+		p.plate:SetSize(geom.w * ratio, geom.h * ratio)
 		if geom.barW then
-			preview.bar:SetSize(geom.barW * ratio, geom.barH * ratio)
+			p.bar:SetSize(geom.barW * ratio, geom.barH * ratio)
 			if geom.barTop then
-				preview.bar:ClearAllPoints()
-				preview.bar:SetPoint("TOP", preview.plate, "TOP", 0, -geom.barTop * ratio)
+				p.bar:ClearAllPoints()
+				p.bar:SetPoint("TOP", p.plate, "TOP", 0, -geom.barTop * ratio)
 			end
 		end
 	end
-	preview.mob.previewRatio = ratio
+	p.mob.previewRatio = ratio
 end
 
 function UpdatePreview()
-	if not (preview.box and db) then return end
-	ApplyPlateGeometry()
-	for _, f in ipairs({ preview.mob, preview.object }) do
-		-- The icons are created at LOW strata: lift them into the options window.
-		f:SetFrameStrata(preview.box:GetFrameStrata())
-		f:SetFrameLevel(preview.box:GetFrameLevel() + 10)
-		AnchorIcon(f, f.plate)
-		f:Show()
-		StyleIcon(f)
+	if not db then return end
+	for _, p in ipairs(previews) do
+		ApplyPlateGeometry(p)
+		for _, f in ipairs({ p.mob, p.object }) do
+			-- The icons are created at LOW strata: lift them into the window.
+			f:SetFrameStrata(p.box:GetFrameStrata())
+			f:SetFrameLevel(p.box:GetFrameLevel() + 10)
+			AnchorIcon(f, f.plate)
+			f:Show()
+			StyleIcon(f)
+		end
+		-- A switched-off kind is shown faded.
+		p.mob:SetAlpha((db.active and db.enabled) and 1 or 0.25)
+		p.object:SetAlpha((db.active and db.objects) and 1 or 0.25)
 	end
-	-- A switched-off kind is shown faded.
-	preview.mob:SetAlpha((db.active and db.enabled) and 1 or 0.25)
-	preview.object:SetAlpha((db.active and db.objects) and 1 or 0.25)
 end
 
 ---------------------------------------------------------------------------------------------
@@ -1571,9 +1585,11 @@ bobber:SetScript("OnUpdate", function()
 	if not (db and db.bounce) then return end
 	local now = GetTime()
 	for _, f in pairs(icons) do Bob(f, now) end
-	if preview.box and preview.box:IsVisible() then
-		Bob(preview.mob, now)
-		Bob(preview.object, now)
+	for _, p in ipairs(previews) do
+		if p.box:IsVisible() then
+			Bob(p.mob, now)
+			Bob(p.object, now)
+		end
 	end
 end)
 
@@ -1717,34 +1733,34 @@ end
 local COL1, COL2 = LEFT, LEFT + 290
 local COLUMN_DROPDOWN = 200
 
+-- Anchor menu: which side of the nameplate the icon sits on. Picking a side starts X/Y from
+-- that side (the defaults for "top", zero for the others), so the icon lands right there.
+local function AddAnchorMenu(tab, key, xKey, yKey, x, y, gate)
+	Gate(gate, AddDropdown(tab, "ICON_ANCHOR", ICON_ANCHOR_ORDER, function(value) return L["ANCHOR_" .. value] end,
+		function() return db[key] end,
+		function(value)
+			if db[key] ~= value then
+				db[key] = value
+				db[xKey] = value == "top" and DEFAULTS[xKey] or 0
+				db[yKey] = value == "top" and DEFAULTS[yKey] or 0
+			end
+			ApplySettings(); RefreshControls()
+		end, x, y, COLUMN_DROPDOWN))
+end
+
 local function BuildDisplayTab(tab)
 	AddResetTabButton(tab, function() ResetKeys(DISPLAY_KEYS) end)
 	AddCheck(tab, "ENABLE_ADDON", "ENABLE_ADDON_TIP", "active", COL1, TOP)
 
-	-- Anchor menu: which side of the nameplate the icon sits on. Picking a side starts X/Y from
-	-- that side (the defaults for "top", zero for the others), so the icon lands right there.
-	local function AnchorMenu(key, xKey, yKey, x, y, gate)
-		Gate(gate, AddDropdown(tab, "ICON_ANCHOR", ICON_ANCHOR_ORDER, function(value) return L["ANCHOR_" .. value] end,
-			function() return db[key] end,
-			function(value)
-				if db[key] ~= value then
-					db[key] = value
-					db[xKey] = value == "top" and DEFAULTS[xKey] or 0
-					db[yKey] = value == "top" and DEFAULTS[yKey] or 0
-				end
-				ApplySettings(); RefreshControls()
-			end, x, y, COLUMN_DROPDOWN))
-	end
-
 	local y = TOP - 58
 	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_MOBS", "enabled", COL1, y))
-	AnchorMenu("anchor", "offsetX", "offset", COL1 + 4, y - 26, MobsOn)
+	AddAnchorMenu(tab, "anchor", "offsetX", "offset", COL1 + 4, y - 26, MobsOn)
 	Gate(MobsOn, AddSlider(tab, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, COL1 + 4, y - 80, "%.2f"))
 	Gate(MobsOn, AddSlider(tab, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 120, "%d"))
 	Gate(MobsOn, AddSlider(tab, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 160, "%d"))
 
 	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_ITEMS", "objects", COL2, y))
-	AnchorMenu("objectAnchor", "objectOffsetX", "objectOffset", COL2 + 4, y - 26, ItemsOn)
+	AddAnchorMenu(tab, "objectAnchor", "objectOffsetX", "objectOffset", COL2 + 4, y - 26, ItemsOn)
 	Gate(ItemsOn, AddSlider(tab, "ICON_SIZE", "objectScale", 0.5, 3.0, 0.05, COL2 + 4, y - 80, "%.2f"))
 	Gate(ItemsOn, AddSlider(tab, "POS_X", "objectOffsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 120, "%d"))
 	Gate(ItemsOn, AddSlider(tab, "POS_Y", "objectOffset", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 160, "%d"))
@@ -2174,12 +2190,201 @@ function OpenPanel()
 end
 
 ---------------------------------------------------------------------------------------------
+-- Setup guide: shown the first time the addon runs on a character (and by /cqi setup).
+-- Page 1 greets and offers "Use default settings" or "Configure"; Configure walks through the
+-- basics with Back / Next, each page beside a live preview. Its controls are the same as the
+-- options panel's, so both stay in sync.
+---------------------------------------------------------------------------------------------
+
+local ShowWizard
+do -- (a block of its own: the main chunk is near Lua's 200-locals limit)
+local WIZARD_WIDTH, WIZARD_HEIGHT = 700, 470
+local wizard
+
+local function MarkSetupSeen()
+	root.setupSeen = root.setupSeen or {}
+	root.setupSeen[charKey] = true
+end
+
+local function AddWizardText(page, titleKey, textKey)
+	local title = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", 28, -54)
+	Loc(title, titleKey)
+	local text = page:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	text:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+	text:SetWidth(400)
+	text:SetJustifyH("LEFT")
+	text:SetSpacing(2)
+	Loc(text, textKey)
+end
+
+local function Always() return true end
+
+local function BuildWizard()
+	local backdrop = BackdropTemplateMixin and "BackdropTemplate" or nil
+	local f = CreateFrame("Frame", ADDON .. "Setup", UIParent, backdrop)
+	f:SetSize(WIZARD_WIDTH, WIZARD_HEIGHT)
+	f:SetPoint("CENTER", 0, 40)
+	f:SetFrameStrata("DIALOG")
+	f:SetClampedToScreen(true)
+	f:EnableMouse(true)
+	f:SetMovable(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	if f.SetBackdrop then
+		f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
+	end
+	if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, f:GetName()) end -- Esc closes it
+	local header = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	header:SetPoint("TOPLEFT", 24, -20)
+	header:SetText(TITLE)
+	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+	close:SetPoint("TOPRIGHT", -6, -6)
+	f:Hide()
+	-- However it closes (X, Esc, a button), the guide doesn't come back on its own.
+	f:SetScript("OnHide", function()
+		MarkSetupSeen()
+		if iconPicker then iconPicker:Hide() end
+	end)
+
+	-- Live preview on the right of the configure pages.
+	local previewPane = CreateFrame("Frame", nil, f)
+	previewPane:SetSize(230, 330)
+	previewPane:SetPoint("TOPRIGHT", -28, -50)
+	BuildPreview(previewPane)
+
+	dropdownHost = f -- the guide's dropdown lists open over the guide, not the hidden panel
+	local pages = {}
+	local function NewPage()
+		local page = CreateFrame("Frame", nil, f)
+		page:SetAllPoints()
+		page:Hide()
+		pages[#pages + 1] = page
+		return page
+	end
+
+	-- 1. Welcome.
+	local welcome = NewPage()
+	local logo = welcome:CreateTexture(nil, "ARTWORK")
+	logo:SetSize(150, 150)
+	logo:SetPoint("TOP", 0, -44)
+	logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\icons\\logo")
+	local hello = welcome:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
+	hello:SetPoint("TOP", logo, "BOTTOM", 0, -14)
+	local greeting = welcome:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	greeting:SetPoint("TOP", hello, "BOTTOM", 0, -12)
+	greeting:SetWidth(520)
+	greeting:SetSpacing(3)
+	Loc(greeting, "WIZ_WELCOME_TEXT")
+	local version = welcome:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	version:SetPoint("BOTTOMRIGHT", -24, 20)
+	version:SetText(AddonVersion())
+	local useDefault = CreateFrame("Button", nil, welcome, "UIPanelButtonTemplate")
+	useDefault:SetSize(200, 30)
+	useDefault:SetPoint("BOTTOMRIGHT", welcome, "BOTTOM", -8, 40)
+	Loc(useDefault, "WIZ_USE_DEFAULT")
+	local configure = CreateFrame("Button", nil, welcome, "UIPanelButtonTemplate")
+	configure:SetSize(200, 30)
+	configure:SetPoint("BOTTOMLEFT", welcome, "BOTTOM", 8, 40)
+	Loc(configure, "WIZ_CONFIGURE")
+
+	-- 2. Icon.
+	local iconPage = NewPage()
+	AddWizardText(iconPage, "WIZ_ICON_TITLE", "WIZ_ICON_TEXT")
+	AddIconPicker(iconPage, 28, -136)
+	AddSlider(iconPage, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, 32, -206, "%.2f")
+	AddCheck(iconPage, "FLOAT", "WIZ_FLOAT_TIP", "bounce", 28, -268)
+	AddCheck(iconPage, "GLOW_SECTION", "WIZ_GLOW_TIP", "glow", 28, -318)
+
+	-- 3. What to show.
+	local showPage = NewPage()
+	AddWizardText(showPage, "WIZ_SHOW_TITLE", "WIZ_SHOW_TEXT")
+	AddCheck(showPage, "QUEST_MOBS", "WIZ_MOBS_TIP", "enabled", 28, -126)
+	AddCheck(showPage, "QUEST_ITEMS", "WIZ_ITEMS_TIP", "objects", 28, -176)
+	AddCheck(showPage, "PROGRESS", "PROGRESS_TIP", "progress", 28, -226)
+	AddCheck(showPage, "SOUND", "SOUND_TIP", "sound", 28, -276)
+
+	-- 4. Where it shows.
+	local placePage = NewPage()
+	AddWizardText(placePage, "WIZ_PLACE_TITLE", "WIZ_PLACE_TEXT")
+	AddAnchorMenu(placePage, "anchor", "offsetX", "offset", 32, -136, Always)
+	AddSlider(placePage, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, 32, -196, "%d")
+	AddSlider(placePage, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, 32, -240, "%d")
+
+	-- 5. Done.
+	local donePage = NewPage()
+	AddWizardText(donePage, "WIZ_DONE_TITLE", "WIZ_DONE_TEXT")
+	dropdownHost = nil
+
+	-- Footer of the configure pages: step, Back, Next (Finish on the last page).
+	local footer = CreateFrame("Frame", nil, f)
+	footer:SetAllPoints()
+	local step = footer:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+	step:SetPoint("BOTTOMLEFT", 28, 26)
+	local nextButton = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+	nextButton:SetSize(130, 26)
+	nextButton:SetPoint("BOTTOMRIGHT", -24, 20)
+	local back = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+	back:SetSize(110, 26)
+	back:SetPoint("RIGHT", nextButton, "LEFT", -8, 0)
+	Loc(back, "WIZ_BACK")
+	local openOptions = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+	openOptions:SetSize(170, 26)
+	openOptions:SetPoint("RIGHT", back, "LEFT", -8, 0)
+	Loc(openOptions, "WIZ_OPEN_OPTIONS")
+
+	local current = 1
+	function f:ShowPage(index)
+		current = index
+		for i, page in ipairs(pages) do page:SetShown(i == index) end
+		local configuring = index > 1
+		previewPane:SetShown(configuring)
+		footer:SetShown(configuring)
+		if iconPicker then iconPicker:Hide() end
+		if configuring then
+			step:SetText(string.format(L.WIZ_STEP, index - 1, #pages - 1))
+			nextButton:SetText(index == #pages and L.WIZ_FINISH or L.WIZ_NEXT)
+			openOptions:SetShown(index == #pages)
+			UpdatePreview()
+		else
+			hello:SetText(string.format(L.WIZ_HELLO, UnitName("player") or ""))
+		end
+	end
+
+	useDefault:SetScript("OnClick", function()
+		f:Hide()
+		print(string.format(L.WIZ_DEFAULT_DONE, "|cffffd200" .. TITLE .. "|r", "|cff00ff00/cqi|r"))
+	end)
+	configure:SetScript("OnClick", function() f:ShowPage(2) end)
+	back:SetScript("OnClick", function() f:ShowPage(current - 1) end)
+	nextButton:SetScript("OnClick", function()
+		if current < #pages then f:ShowPage(current + 1) else f:Hide() end
+	end)
+	openOptions:SetScript("OnClick", function()
+		f:Hide()
+		OpenPanel()
+	end)
+	return f
+end
+
+function ShowWizard()
+	wizard = wizard or BuildWizard()
+	RefreshControls()
+	wizard:Show()
+	wizard:ShowPage(1)
+end
+end
+
+---------------------------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------------------------
 
 -- Measures a real enemy nameplate (size, effective scale, health bar) for the preview. Saved, so
 -- the preview is right even before a plate shows up in a new session.
 local plateMeasured = false
+local MeasurePlate
+do -- (own block: keeps the helpers out of the main chunk, near the 200-locals limit)
 
 -- The game shrinks far plates and enlarges the target's (it scales the plate or its UnitFrame),
 -- and a plate is often first seen far away: those scales are taken out, so the saved size is
@@ -2218,7 +2423,7 @@ local function TopFromAnchors(region, plate, frame, depth)
 	end
 end
 
-local function MeasurePlate(unit, force)
+function MeasurePlate(unit, force)
 	if (plateMeasured and not force) or not (root and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
 	local plate = C_NamePlate.GetNamePlateForUnit(unit)
 	if not plate then return end
@@ -2259,6 +2464,7 @@ local function MeasurePlate(unit, force)
 	if UpdatePreview then UpdatePreview() end
 	return geom
 end
+end
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
@@ -2298,6 +2504,12 @@ events:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "PLAYER_LOGIN" then
 		ResolveCharacter() -- the character name is certain by now
 		print(string.format(L.WELCOME, "|cffffd200" .. TITLE .. "|r", AddonVersion(), "|cff00ff00/cqi|r"))
+		-- First time on this character: the setup guide, once the loading screen is gone.
+		if not root.setupSeen[charKey] then
+			C_Timer.After(3, function()
+				if not root.setupSeen[charKey] then ShowWizard() end
+			end)
+		end
 		RebuildQuestTitles(); RebuildObjectiveTexts()
 		RefreshControls()
 		ApplySettings()
@@ -2349,6 +2561,8 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 		ApplySettings()
 		RefreshControls()
 		print("|cffffd200" .. TITLE .. "|r " .. (db.active and L.ON or L.OFF))
+	elseif cmd == "setup" then
+		ShowWizard()
 	elseif cmd == "plate" then
 		-- Measures the target's nameplate for the preview and prints what was found.
 		-- Protected: an error here would leave the text stuck in the chat box.
