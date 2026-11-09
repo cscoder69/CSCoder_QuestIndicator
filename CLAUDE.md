@@ -8,7 +8,8 @@ Read this first when working on the addon. Last updated 2026-11-08 (v1.1.0 publi
   for web UIs (CurseForge, GitHub), **one step at a time**.
 - There is no way to run WoW here: always run the local checks below before saying something works,
   and ask the user to `/reload` and send screenshots for anything visual.
-- Publish (tag) **only when the user says so** ("publica").
+- Publish (tag) **only when the user says so**: "publica", and also **"manda/sobe pro git" means publish**
+  (commit + push + tag the next version), not just push.
 
 ## What it is
 A floating, animated "!" over quest mobs (on their nameplates) and over the nearest quest item in
