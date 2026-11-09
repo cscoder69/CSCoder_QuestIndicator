@@ -517,3 +517,68 @@ local v2t = {
 for code, keys in pairs(v2t) do
 	for k, v in pairs(keys) do locales[code][k] = v end
 end
+
+-- Progress text and X/Y positions. English only for now; the other languages fall back to it
+-- until the layout is approved.
+local progress = {
+	TAB_PROGRESS = "Progress",
+	PROGRESS = "Show quest progress",
+	PROGRESS_TIP = "The objective count (8/12) next to each quest mob.",
+	PROGRESS_ATTACH = "Attach to the icon",
+	PROGRESS_ATTACH_TIP = "On: glued to the right of the icon, it follows it. Off: free, with its own X/Y.",
+	PROGRESS_FLOAT = "Float with the icon",
+	PROGRESS_FLOAT_TIP = "Bobs up and down together with the icon (needs Float in the Icon tab).",
+	TEXT_SIZE = "Text size",
+	POS_X = "X",
+	POS_Y = "Y",
+	TEXT_FONT = "Font",
+	FONT_friz = "Friz Quadrata",
+	FONT_arial = "Arial Narrow",
+	FONT_skurri = "Skurri",
+	FONT_morpheus = "Morpheus",
+	TEXT_OUTLINE = "Outline",
+	OUTLINE_none = "None",
+	OUTLINE_thin = "Thin",
+	OUTLINE_thick = "Thick",
+	TEXT_COLOR = "Color",
+	COLOR_white = "White",
+	COLOR_gold = "Gold",
+	COLOR_green = "Green",
+	COLOR_kind = "Same as the icon",
+}
+for k, v in pairs(progress) do locales.enUS[k] = v end
+
+-- Profiles tab in the Ace3 layout (English only until the layout is approved).
+local profilesV3 = {
+	PROF_INTRO = "Profiles let each character have its own settings.",
+	PROF_RESET_DESC = "Put the current profile back to its default settings.",
+	PROF_RESET = "Reset Profile",
+	PROF_CURRENT = "Current Profile:",
+	PROF_CHOOSE_DESC = "Create a new profile by typing a name, or pick an existing one.",
+	PROF_NEW = "New",
+	PROF_CHOOSE = "Existing Profiles",
+	PROF_COPY_DESC = "Copy the settings of another profile into the current one.",
+	PROF_COPY = "Copy From",
+	PROF_DELETE_DESC = "Delete profiles you no longer use.",
+	PROF_DELETE = "Delete a Profile",
+	PROF_DELETE_CONFIRM = "Delete the profile \"%s\"?",
+}
+for k, v in pairs(profilesV3) do locales.enUS[k] = v end
+
+-- Objective-complete sound (English only until the layout is approved).
+local soundText = {
+	SOUND = "Sound when an objective completes",
+	SOUND_TIP = "Plays when a quest objective is done (12/12).",
+	SOUND_CHOICE = "Sound",
+	SOUND_TEST = "Test",
+	SOUND_quest = "Quest complete",
+	SOUND_ping = "Map ping",
+	SOUND_ready = "Ready check",
+	SOUND_warning = "Raid warning",
+	SOUND_levelup = "Level up",
+}
+for k, v in pairs(soundText) do locales.enUS[k] = v end
+
+-- One scrolling settings page with sections (English only until the layout is approved).
+locales.enUS.TAB_SETTINGS = "Settings"
+locales.enUS.RESET_SECTION = "Reset section"

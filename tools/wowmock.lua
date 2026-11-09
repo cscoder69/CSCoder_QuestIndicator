@@ -58,6 +58,7 @@ env.GetCursorPosition = function() return 150, 120 end
 env.GetTime = function() return 12.5 end
 env.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
 env.print = function(...) end
+env.PlaySound = function() end
 env.C_Timer = { After = function(_, fn) fn() end }
 env.C_NamePlate = { GetNamePlates = function() return {} end, GetNamePlateForUnit = function() return nil end }
 env.C_QuestLog = { GetNumQuestLogEntries = function() return 0 end, GetInfo = function() return nil end, GetQuestObjectives = function() return {} end }
@@ -100,15 +101,21 @@ try("OnUpdate", eventFrame._scripts.OnUpdate, eventFrame, 2)
 local snapshot = {}
 for i, f in ipairs(frames) do snapshot[i] = f end
 for _, f in ipairs(snapshot) do if f._kind == "EditBox" then f._text = "Raid" end end
-for round = 1, 3 do
-	for i, f in ipairs(snapshot) do
-		for _, script in ipairs({ "OnShow", "OnEnter", "OnLeave", "OnClick", "OnDragStart", "OnDragStop" }) do
+local function clickAll(list, round)
+	for i, f in ipairs(list) do
+		for _, script in ipairs({ "OnShow", "OnEnter", "OnLeave", "OnClick", "OnDragStart", "OnDragStop", "OnEnterPressed" }) do
 			if f._scripts[script] then try(script .. "#" .. i, f._scripts[script], f, round == 2 and "RightButton" or "LeftButton") end
 		end
 		if f._scripts.OnValueChanged then try("Slider#" .. i, f._scripts.OnValueChanged, f, 0.5 * round) end
 		if f._scripts.OnUpdate and f ~= eventFrame then try("OnUpdate#" .. i, f._scripts.OnUpdate, f, 0.1) end
 	end
 end
+for round = 1, 3 do clickAll(snapshot, round) end
+-- Dropdown rows are made when a list opens: click everything once more, new frames included.
+local later = {}
+for i, f in ipairs(frames) do later[i] = f end
+for _, f in ipairs(later) do if f._kind == "EditBox" then f._text = "Solo" end end
+clickAll(later, 1)
 try("slash", env.SlashCmdList.CSCODERQUESTINDICATOR, "toggle")
 try("slash open", env.SlashCmdList.CSCODERQUESTINDICATOR, "")
 
@@ -116,11 +123,12 @@ local db = env.CSCoderQuestIndicatorDB
 local names = {}
 for name in pairs(db.profiles) do names[#names + 1] = name end
 print("profiles:", table.concat(names, ", "), "| char ->", db.chars["Tester - Realm"], "| language:", db.language)
-local known = { IsMouseButtonDown = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1 }
+local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1 }
 local unexpected = {}
 for k in pairs(missing) do if not known[k] then unexpected[#unexpected + 1] = k end end
 print("unexpected nil globals:", #unexpected == 0 and "none" or table.concat(unexpected, ", "))
 print("errors:", #errors)
 for _, e in ipairs(errors) do print("  " .. e) end
-local p = db.profiles.Default
-print("Default: scale", p.scale, "offset", p.offset, "style", p.style, "glow", p.glow, "| root.scale", db.scale, "| savedCVars", db.savedCVars and db.savedCVars.SoftTargetIconGameObject)
+local pname = db.profiles.Default and "Default" or db.chars["Tester - Realm"]
+local p = db.profiles[pname]
+print(pname .. ": scale", p.scale, "offset", p.offset, "style", p.style, "glow", p.glow, "| root.scale", db.scale, "| savedCVars", db.savedCVars and db.savedCVars.SoftTargetIconGameObject)

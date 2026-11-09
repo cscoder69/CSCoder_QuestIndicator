@@ -23,7 +23,7 @@ a Classic base with modern APIs (C_NamePlate, C_TooltipInfo, C_QuestLog, Setting
 | `CSCoder_QuestIndicator.lua` | Everything else (sections below). |
 | `icons/*.tga` | 5 styles, 128 px, 32-bit uncompressed TGA, top-left origin. Made by `tools/make_icons.ps1`. |
 | `media/` | README images only (logo, icon sheet). Ignored by the packager. |
-| `tools/` | Dev tools (not packaged): `wowmock.lua`, `make_icons.ps1`, `make_logo.ps1`. |
+| `tools/` | Dev tools (not packaged): `wowmock.lua`, `make_icons.ps1`, `make_logo.ps1`, `switch_mode.ps1` + `mode-dev.bat` / `mode-release.bat` (installed addon = junction to source, or a copy of the latest GitHub release). The CurseForge app must NOT manage this addon on the dev PC: on 2026-11-09 it replaced the junction with the v1.1.0 copy. |
 | `.pkgmeta` | Packager: ignores media, README, .github, tools, CLAUDE.md. |
 | `.github/workflows/release.yml` | Tag `v*` → BigWigs packager `-g forever` → CurseForge + GitHub Releases. |
 
@@ -51,12 +51,26 @@ live in game after `/reload`.
   (`pendingCVars`).
 - **Options panel** (Options > AddOns > **CS.Coder > Quest Indicator**; the "CS.Coder" parent is shared
   through the global `CSCoderOptionsParent` so future CS.Coder addons land under it):
+  - **Since 2026-11-09 (user request): only TWO tabs, "Settings" and "Profiles"**, each as wide as its
+    label (Ace3 style, `LayoutTabs`, re-run on language change). Settings = ONE scrolling page
+    (`BuildSettingsTab`, `SETTINGS_SECTIONS`: Display, Icon, Progress, Behavior), each section with a
+    heading and a small "Reset section" button. Dropdown lists are parented to the panel so the scroll
+    frame does not clip them. Plain wheel scrolls the page; Shift+wheel steps a slider.
+    Behavior also has the objective-complete sound (on/off, sound choice, Test).
+    The preview copies a real enemy nameplate measured in the world (`MeasurePlate` ->
+    `root.plateGeom`, `ApplyPlateGeometry`, icon `previewRatio`) so preview == world.
+  - (Older layout notes below.)
   - Left: a box of **four Ace3-style tabs** (game textures `UI-OptionsFrame-ActiveTab/InActiveTab`,
     tabs stretched to fill, like BlizzMove): **Display** (Enable addon; Quest mobs ☑ + size, horizontal
     offset, height; Quest items ☑ + size, height), **Icon** (style; Float ☑ + height, duration; Glow ☑ +
     intensity), **Behavior** (color by quest type, minimap button, In combat dropdown, Language dropdown),
-    **Profiles** (list, new/copy/rename/delete with confirm, Reset everything). Each tab has "Reset this tab".
-  - Right: the **live preview, fixed** outside the tabs (mob with fake nameplate on top, crate below).
+    **Profiles** (since 2026-11-09 the Ace3/RareScanner layout the user asked for: intro, Reset Profile,
+    Current Profile, New editbox + Existing Profiles dropdown, Copy From, Delete a Profile with a
+    StaticPopup confirm; no rename). Other tabs have "Reset this tab". Dropdowns accept a function
+    for options (lists that change).
+  - Preview: since 2026-11-09 its own movable window (`PreviewWindow`, opens/closes with the panel,
+    close button sets `root.previewHidden`, position in `root.previewPos`, "Preview" button toggles);
+    the options box fills the panel. Sliders have a type-in box (Enter applies, Esc reverts).
   - **Gates:** controls fade and lock when what they depend on is off (`Gate`, `UpdateGates`). The minimap
     checkbox never locks (it is how you turn the addon back on).
   - Dropdowns are self-made (UIDropDownMenu differs/deprecated across clients).
@@ -101,3 +115,18 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
 - More: custom icon color, show only on target/mouseover, transparency, hide in dungeons/raids,
   sound when an objective completes, keybinding to toggle.
 - Translations of any new text: write English first, translate when the layout is approved.
+- **Roadmap agreed 2026-11-09** (in this order of interest):
+  1. Progress text ("8/12") — BUILT 2026-11-09, awaiting in-game test: own "Progress" tab, on/off,
+     "Attach to the icon" (X/Y from the icon, follows it; off: X/Y from the nameplate) and a separate
+     "Float with the icon" (bobs in step; needs the icon's Float), own size and X/Y. Text frame
+     undoes the icon scale (`f.text`, `PlaceText`).
+  2. X / Y labels with -200..200 ranges and mouse-wheel steps — BUILT 2026-11-09 (items got X too).
+     Drag-to-position on the preview: user postponed it for a long time (2026-11-09).
+  3. Separate look for mobs vs items (approved).
+  4. Custom icon color + transparency.
+  5. Sound when an objective completes (user loved it).
+  6. Small extras, LAST: keybinding toggle, hide in dungeons/raids, only on target/mouseover.
+  - Objective tracker with badges: later, it overlaps Questie.
+  - CurseForge page: GIF of the icons, screenshots of the panel/styles, better title/summary/description.
+- **Other WoW clients** (Classic Era/Anniversary, Cata/MoP Classic, Retail): user decided 2026-11-09
+  to wait until the addon is more mature. Don't push it before then.

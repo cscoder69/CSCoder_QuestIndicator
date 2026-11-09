@@ -17,10 +17,20 @@ local DEFAULTS = {
 	objects = true,      -- icon over the soft-targeted quest object in the world
 	style = "gold",      -- icon style (file in icons\)
 	scale = 1.5,         -- mob icon size
-	offsetX = 0,         -- mob icon horizontal position
-	offset = -15,        -- mob icon height above the nameplate
+	offsetX = 0,         -- mob icon X
+	offset = -15,        -- mob icon Y (above the nameplate)
 	objectScale = 1.5,   -- object icon size
-	objectOffset = 10,   -- object icon height above the object
+	objectOffsetX = 0,   -- object icon X
+	objectOffset = 10,   -- object icon Y (above the object)
+	progress = true,     -- objective count ("8/12") on quest mobs
+	progressAttach = true, -- true: X/Y from the icon (follows it); false: X/Y from the nameplate
+	progressFloat = true,  -- bobs up and down with the icon (when the icon floats)
+	progressSize = 13,   -- its font size
+	progressFont = "friz",     -- key in TEXT_FONTS
+	progressOutline = "thin",  -- "none", "thin", "thick"
+	progressColor = "white",   -- "white", "gold", "green" or "kind" (same colour as the icon)
+	progressX = 36,      -- its X
+	progressY = 0,       -- its Y
 	bounce = true,       -- floating up/down animation
 	bounceHeight = 7,    -- how far it floats (pixels)
 	bounceSpeed = 0.9,   -- seconds for one move up (lower = faster)
@@ -30,6 +40,8 @@ local DEFAULTS = {
 	combat = "show",     -- "show", "fade" or "hide" the icons in combat
 	minimap = true,      -- minimap button
 	minimapAngle = 220,  -- its position around the minimap (degrees)
+	sound = true,        -- play a sound when a quest objective completes
+	soundChoice = "quest", -- key in QUEST_SOUNDS
 }
 -- Saved layout: CSCoderQuestIndicatorDB = { version, language, profiles = { name = settings },
 -- chars = { "Name - Realm" = profile name }, savedCVars }.
@@ -44,6 +56,13 @@ local SOFT = "softinteract"  -- the game's interaction soft target (one world ob
 local FADE_ALPHA = 0.35
 local KIND_TINT = { daily = { 0.55, 0.8, 1 }, group = { 1, 0.5, 0.45 } }
 local KIND_STYLE = { daily = "blue", group = "red" }
+-- Progress text formatting: the fonts every client ships, outlines and colours.
+local TEXT_FONTS = { friz = "Fonts\\FRIZQT__.TTF", arial = "Fonts\\ARIALN.TTF", skurri = "Fonts\\skurri.ttf", morpheus = "Fonts\\MORPHEUS.TTF" }
+local TEXT_FONT_ORDER = { "friz", "arial", "skurri", "morpheus" }
+local TEXT_OUTLINES = { none = "", thin = "OUTLINE", thick = "THICKOUTLINE" }
+local TEXT_COLORS = { white = { 1, 1, 1 }, gold = { 1, 0.82, 0 }, green = { 0.3, 1, 0.3 } }
+local KIND_TEXT_COLOR = { normal = { 1, 0.82, 0 }, daily = { 0.55, 0.8, 1 }, group = { 1, 0.5, 0.45 } }
+local POSITION_RANGE = 200 -- X/Y sliders go from -200 to 200
 
 local root, db, charKey  -- saved variables, active profile, "Name - Realm"
 local L                   -- active language table
@@ -56,7 +75,8 @@ local inCombat = false
 -- Quest objects need both the master switch and their own option.
 local function ObjectsOn() return db.active and db.objects end
 local RefreshSoftObject, EnableObjectNameplates, RestoreObjectCVars -- soft-target objects
-local RefreshControls, UpdatePreview, UpdateMinimapButton, UpdateGates -- options UI
+local RefreshControls, UpdatePreview, UpdateMinimapButton, UpdateGates, LayoutTabs -- options UI
+local settingsScroll -- the scrolling settings page
 
 ---------------------------------------------------------------------------------------------
 -- Language
@@ -128,8 +148,16 @@ local function ProgressUnfinished(text)
 	return nil
 end
 
+-- The count shown next to the icon: "3/10", or "45%" for percentage objectives.
+local function ProgressText(text)
+	local have, need = text:match("(%d+)%s*/%s*(%d+)")
+	if have then return have .. "/" .. need end
+	return text:match("(%d+%%)")
+end
+
 -- Reads tooltip lines (TooltipInfo data or plain strings) and answers: true = still needed,
--- false = quest-related but finished, nil = not quest-related. Second value: the quest title.
+-- false = quest-related but finished, nil = not quest-related. Then the quest title and the
+-- progress of the first unfinished objective ("3/10"), when there is one.
 local function QuestStateFromLines(lines)
 	local lineTypes = Enum and Enum.TooltipDataLineType
 	local objectiveType = lineTypes and lineTypes.QuestObjective
@@ -140,12 +168,12 @@ local function QuestStateFromLines(lines)
 		local lineType = type(line) == "table" and line.type or nil
 		if objectiveType and lineType == objectiveType then
 			sawQuest = true
-			if line.completed == false then return true, title end
-			if line.completed == nil and ProgressUnfinished(text) then return true, title end
+			if line.completed == false then return true, title, ProgressText(text) end
+			if line.completed == nil and ProgressUnfinished(text) then return true, title, ProgressText(text) end
 		elseif (titleType and lineType == titleType) or activeTitles[text] then
 			sawQuest, title = true, text
 		elseif sawQuest and ProgressUnfinished(text) then
-			return true, title
+			return true, title, ProgressText(text)
 		end
 	end
 	if sawQuest then return false, title end
@@ -170,11 +198,11 @@ local function ByTooltipScan(unit)
 		local fs = _G[ADDON .. "ScannerTextLeft" .. i]
 		lines[#lines + 1] = fs and fs:GetText() or ""
 	end
-	local state, title = QuestStateFromLines(lines)
-	return state == true, title
+	local state, title, progress = QuestStateFromLines(lines)
+	return state == true, title, progress
 end
 
--- Returns: still needed?, quest kind.
+-- Returns: still needed?, quest kind, progress text.
 local function IsQuestMob(unit)
 	if not UnitExists(unit) or UnitIsPlayer(unit) or UnitIsDead(unit) then return false end
 	if UnitIsFriend("player", unit) and not UnitCanAttack("player", unit) then return false end
@@ -182,15 +210,15 @@ local function IsQuestMob(unit)
 		local ok, related = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, unit)
 		if ok and related ~= nil then
 			if not related then return false end
-			local state, title = ByTooltipInfo(unit)
+			local state, title, progress = ByTooltipInfo(unit)
 			if state == false then return false end
-			return true, KindOf(title)
+			return true, KindOf(title), progress
 		end
 	end
-	local state, title = ByTooltipInfo(unit)
-	if state ~= nil then return state, KindOf(title) end
-	local scanned, scannedTitle = ByTooltipScan(unit)
-	return scanned, KindOf(scannedTitle)
+	local state, title, progress = ByTooltipInfo(unit)
+	if state ~= nil then return state, KindOf(title), progress end
+	local scanned, scannedTitle, scannedProgress = ByTooltipScan(unit)
+	return scanned, KindOf(scannedTitle), scannedProgress
 end
 
 ---------------------------------------------------------------------------------------------
@@ -202,6 +230,25 @@ local function CombatAlpha()
 	if db.combat == "hide" then return 0 end
 	if db.combat == "fade" then return FADE_ALPHA end
 	return 1
+end
+
+-- Places the progress text. Attached: glued to the right of the icon, so it follows the icon's
+-- position and size (its X/Y are locked). Detached: X/Y from the nameplate. wave (0..1) is the
+-- float phase when it floats with the icon; the icon moves bounceHeight in its own scale, so the
+-- text moves bounceHeight * scale.
+local ATTACH_GAP = 2
+local function PlaceText(f, wave)
+	local text, label = f.text, f.text.label
+	local lift = wave * db.bounceHeight * (f.isObject and db.objectScale or db.scale)
+	text:ClearAllPoints()
+	label:ClearAllPoints()
+	if db.progressAttach then
+		label:SetPoint("LEFT")
+		text:SetPoint("LEFT", f, "RIGHT", ATTACH_GAP, lift)
+	else
+		label:SetPoint("CENTER")
+		text:SetPoint("CENTER", f.plate or f:GetParent(), "TOP", db.progressX, db.progressY + lift)
+	end
 end
 
 local function StyleIcon(f)
@@ -219,8 +266,29 @@ local function StyleIcon(f)
 	f.icon:SetTexture(ICON_DIR .. style)
 	if tint then f.icon:SetVertexColor(tint[1], tint[2], tint[3]) else f.icon:SetVertexColor(1, 1, 1) end
 
-	f:SetScale(f.isObject and db.objectScale or db.scale)
+	local scale = f.isObject and db.objectScale or db.scale
+	f:SetScale(scale * (f.previewRatio or 1))
 	f:SetAlpha(f.isPreview and 1 or CombatAlpha())
+
+	-- Progress text ("8/12", quest mobs only). It has its own size and position: the frame undoes
+	-- the icon's scale, so its size and X/Y don't change with the icon size.
+	local text = f.text
+	local showText = db.progress and not f.isObject and f.progressValue ~= nil
+	text:SetShown(showText)
+	if showText then
+		local font = TEXT_FONTS[db.progressFont] or TEXT_FONTS.friz
+		text.label:SetFont(font, db.progressSize, TEXT_OUTLINES[db.progressOutline] or "OUTLINE")
+		-- "Icon colour" follows the quest type like the icon does (gold, blue daily, red group).
+		local color = TEXT_COLORS[db.progressColor]
+		if db.progressColor == "kind" then
+			color = db.colorByType and KIND_TEXT_COLOR[f.kind or "normal"] or KIND_TEXT_COLOR.normal
+		end
+		color = color or TEXT_COLORS.white
+		text.label:SetTextColor(color[1], color[2], color[3])
+		text.label:SetText(f.progressValue)
+		text:SetScale(1 / scale)
+		PlaceText(f, 0)
+	end
 
 	f.glow:SetVertexColor(1, 0.82, 0.2, db.glowAlpha)
 	f.glow:SetShown(db.glow)
@@ -237,7 +305,7 @@ end
 local function AnchorIcon(f, plate)
 	f:ClearAllPoints()
 	if f.isObject then
-		f:SetPoint("BOTTOM", plate, "TOP", 0, db.objectOffset)
+		f:SetPoint("BOTTOM", plate, "TOP", db.objectOffsetX, db.objectOffset)
 	else
 		f:SetPoint("BOTTOM", plate, "TOP", db.offsetX, db.offset)
 	end
@@ -255,6 +323,7 @@ local function CreateIcon()
 	inner:SetPoint("CENTER")
 	f.inner = inner
 	f.phase = math.random() * 10 -- icons don't all float in step
+	f.previewRatio = 1 -- set by the options preview to match real plates
 
 	local glow = inner:CreateTexture(nil, "BACKGROUND")
 	glow:SetTexture(GLOW_TEXTURE)
@@ -266,6 +335,15 @@ local function CreateIcon()
 	local icon = inner:CreateTexture(nil, "ARTWORK")
 	icon:SetAllPoints()
 	f.icon = icon
+
+	local text = CreateFrame("Frame", nil, f)
+	text:SetSize(60, 20)
+	text.label = text:CreateFontString(nil, "OVERLAY")
+	text.label:SetPoint("CENTER")
+	text.label:SetFont(TEXT_FONTS.friz, DEFAULTS.progressSize, "OUTLINE")
+	text.label:SetTextColor(1, 1, 1)
+	text:Hide()
+	f.text = text
 
 	local pulse = glow:CreateAnimationGroup()
 	pulse:SetLooping("REPEAT")
@@ -289,16 +367,19 @@ local function CreateIcon()
 	return f
 end
 
-local function ShowIcon(unit, plate, kind)
+local function ShowIcon(unit, plate, kind, progress)
 	kind = kind or "normal"
 	local f = icons[unit]
 	if f then
-		if f.kind ~= kind then f.kind = kind; StyleIcon(f) end
+		if f.kind ~= kind or f.progressValue ~= progress then
+			f.kind, f.progressValue = kind, progress
+			StyleIcon(f)
+		end
 		return
 	end
 	f = table.remove(pool) or CreateIcon()
 	icons[unit] = f
-	f.unit, f.isObject, f.kind = unit, unit == SOFT, kind
+	f.unit, f.isObject, f.kind, f.progressValue = unit, unit == SOFT, kind, progress
 	f:SetParent(plate)
 	f:SetFrameStrata("LOW")
 	AnchorIcon(f, plate)
@@ -314,7 +395,8 @@ local function HideIcon(unit)
 	f.pulse:Stop()
 	f:Hide()
 	f:SetParent(UIParent)
-	f.unit = nil
+	f.unit, f.progressValue = nil, nil
+	f.text:Hide()
 	table.insert(pool, f)
 end
 
@@ -326,8 +408,8 @@ end
 local function Refresh(unit)
 	local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit(unit)
 	if db.active and db.enabled and plate then
-		local needed, kind = IsQuestMob(unit)
-		if needed then ShowIcon(unit, plate, kind) return end
+		local needed, kind, progress = IsQuestMob(unit)
+		if needed then ShowIcon(unit, plate, kind, progress) return end
 	end
 	HideIcon(unit)
 end
@@ -362,10 +444,23 @@ end
 ---------------------------------------------------------------------------------------------
 
 local objectiveTexts = {} -- { text = lower case objective, kind = quest kind }
+local objectiveStates = {} -- questID -> { [objective index] = finished }, to hear one complete
+
+-- Sounds for "objective complete": sound kit IDs that every client has.
+local QUEST_SOUNDS = { quest = 878, ping = 3175, ready = 8960, warning = 8959, levelup = 888 }
+local QUEST_SOUND_ORDER = { "quest", "ping", "ready", "warning", "levelup" }
+
+local function PlayQuestSound()
+	local id = QUEST_SOUNDS[db.soundChoice] or QUEST_SOUNDS.quest
+	if PlaySound then pcall(PlaySound, id, "Master") end
+end
 
 local function RebuildObjectiveTexts()
 	wipe(objectiveTexts)
 	if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then return end
+	-- An objective that was unfinished on the last scan and is finished now plays the sound
+	-- (once per scan). Quests seen for the first time (login, just accepted) stay silent.
+	local states, completed = {}, false
 	local count = (C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetNumQuestLogEntries()) or 0
 	for i = 1, count do
 		local questID = C_QuestLog.GetQuestIDForLogIndex and C_QuestLog.GetQuestIDForLogIndex(i)
@@ -374,12 +469,19 @@ local function RebuildObjectiveTexts()
 			questID = info and not info.isHeader and info.questID
 		end
 		local objectives = questID and C_QuestLog.GetQuestObjectives(questID)
-		for _, objective in ipairs(objectives or {}) do
+		for index, objective in ipairs(objectives or {}) do
 			if objective.text and not objective.finished then
 				objectiveTexts[#objectiveTexts + 1] = { text = objective.text:lower(), kind = kindByQuestID[questID] or "normal" }
 			end
+			local finished = objective.finished and true or false
+			states[questID] = states[questID] or {}
+			states[questID][index] = finished
+			local before = objectiveStates[questID] and objectiveStates[questID][index]
+			if finished and before == false then completed = true end
 		end
 	end
+	objectiveStates = states
+	if completed and db.active and db.sound then PlayQuestSound() end
 end
 
 local function ObjectiveKindForName(name)
@@ -584,6 +686,7 @@ end
 
 local function Relabel()
 	for _, entry in ipairs(localized) do entry[1]:SetText(L[entry[2]]) end
+	if LayoutTabs then LayoutTabs() end
 	RefreshControls()
 end
 
@@ -644,6 +747,17 @@ local function AddCheck(parent, labelKey, tipKey, settingKey, x, y)
 	return check
 end
 
+-- Up to 2 decimals, trailing zeros dropped ("12", "1,5", "1,25"), with the decimal comma in
+-- every panel language except English.
+local function FormatNumber(value)
+	local text = string.format("%.2f", value):gsub("0+$", ""):gsub("%.$", "")
+	if text == "-0" then text = "0" end
+	local lang = root and root.language
+	if lang == nil or lang == "auto" then lang = GetLocale() end
+	if lang ~= "enUS" and lang ~= "enGB" then text = text:gsub("%.", ",") end
+	return text
+end
+
 local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, format)
 	local title = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	title:SetPoint("TOPLEFT", x, y)
@@ -658,8 +772,47 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 		slider:SetBackdrop({ bgFile = "Interface\\Buttons\\UI-SliderBar-Background", edgeFile = "Interface\\Buttons\\UI-SliderBar-Border", tile = true, tileSize = 8, edgeSize = 8, insets = { left = 3, right = 3, top = 6, bottom = 6 } })
 	end
 	slider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
-	local function UpdateLabel(value) title:SetText(L[labelKey] .. ":  |cffffd200" .. string.format(format, value) .. "|r") end
+	-- A small box next to the slider shows the value; type a number and press Enter to set it,
+	-- Escape (or clicking away) puts the current value back.
+	local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+	input:SetSize(52, 20)
+	input:SetPoint("LEFT", slider, "RIGHT", 14, 0)
+	input:SetAutoFocus(false)
+	input:SetMaxLetters(8)
+	input:SetJustifyH("CENTER")
+	input:SetFontObject("GameFontHighlightSmall")
+	-- Text set while the box is hidden stays scrolled to its end and looks empty: rewind it.
+	local function ShowValue(value)
+		input:SetText(FormatNumber(value))
+		input:SetCursorPosition(0)
+	end
+	input:SetScript("OnShow", function() ShowValue(db[settingKey]) end)
+	local function UpdateLabel(value)
+		title:SetText(L[labelKey])
+		ShowValue(value)
+	end
 	local syncing = false
+	-- Typed values keep up to 2 decimals, finer than the slider's step; the slider just follows.
+	input:SetScript("OnEnterPressed", function(self)
+		local typed = tonumber(((self:GetText() or ""):gsub(",", ".")))
+		if typed then
+			typed = math.max(low, math.min(high, math.floor(typed * 100 + 0.5) / 100))
+			if db[settingKey] ~= typed then
+				db[settingKey] = typed
+				syncing = true
+				slider:SetValue(typed)
+				syncing = false
+				ApplySettings()
+			end
+		end
+		ShowValue(db[settingKey])
+		self:ClearFocus()
+	end)
+	input:SetScript("OnEscapePressed", function(self)
+		ShowValue(db[settingKey])
+		self:ClearFocus()
+	end)
+	input:SetScript("OnEditFocusLost", function() ShowValue(db[settingKey]) end)
 	local function Sync()
 		syncing = true
 		slider:SetValue(db[settingKey]); UpdateLabel(db[settingKey])
@@ -675,7 +828,19 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 		UpdateLabel(value)
 		ApplySettings()
 	end)
-	return slider, title
+	-- Shift + mouse wheel moves one step (fine tuning on the wide X/Y ranges); the plain wheel
+	-- keeps scrolling the settings page.
+	slider:EnableMouseWheel(true)
+	slider:SetScript("OnMouseWheel", function(self, delta)
+		if IsShiftKeyDown and IsShiftKeyDown() then
+			self:SetValue(math.max(low, math.min(high, db[settingKey] + delta * step)))
+		elseif settingsScroll then
+			local range = settingsScroll:GetVerticalScrollRange() or 0
+			local target = (settingsScroll:GetVerticalScroll() or 0) - delta * 40
+			settingsScroll:SetVerticalScroll(math.max(0, math.min(range, target)))
+		end
+	end)
+	return slider, title, input
 end
 
 -- A section heading with its own on/off check on the left.
@@ -711,11 +876,12 @@ end
 local DROPDOWN_ROW = 18
 local openList -- the dropdown list currently open, if any
 
-local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y)
+local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, width)
+	width = width or 240
 	local heading = AddHeading(parent, labelKey, x, y)
 	local backdrop = BackdropTemplateMixin and "BackdropTemplate" or nil
 	local button = CreateFrame("Button", nil, parent, backdrop)
-	button:SetSize(240, 24)
+	button:SetSize(width, 24)
 	button:SetPoint("TOPLEFT", x, y - 18)
 	if button.SetBackdrop then
 		button:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
@@ -733,9 +899,10 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y)
 	button:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
 	button:GetHighlightTexture():SetAlpha(0.2)
 
-	local list = CreateFrame("Frame", nil, button, backdrop)
+	-- The list lives on the panel, not under the button: inside the scrolling page it would be
+	-- cut off at the bottom of the view.
+	local list = CreateFrame("Frame", nil, panel, backdrop)
 	list:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, 2)
-	list:SetSize(240, #options * DROPDOWN_ROW + 10)
 	list:SetFrameStrata("FULLSCREEN_DIALOG")
 	if list.SetBackdrop then
 		list:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
@@ -744,17 +911,12 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y)
 	end
 	list:Hide()
 
+	-- options can be a function (lists that change, like profiles): rows are made as needed.
 	local rows = {}
-	local function Sync()
-		value:SetText(labelFor(get()))
-		for i, row in ipairs(rows) do
-			row.text:SetText(labelFor(options[i]))
-			row.check:SetShown(options[i] == get())
-		end
-	end
-	for i, option in ipairs(options) do
+	local Sync
+	local function MakeRow(i)
 		local row = CreateFrame("Button", nil, list)
-		row:SetSize(232, DROPDOWN_ROW)
+		row:SetSize(width - 8, DROPDOWN_ROW)
 		row:SetPoint("TOPLEFT", 4, -5 - (i - 1) * DROPDOWN_ROW)
 		row.check = row:CreateTexture(nil, "ARTWORK")
 		row.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
@@ -765,12 +927,27 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y)
 		row.text:SetPoint("RIGHT", -4, 0)
 		row.text:SetJustifyH("LEFT")
 		row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-		row:SetScript("OnClick", function()
+		row:SetScript("OnClick", function(self)
 			list:Hide()
-			set(option)
+			set(self.option)
 			Sync()
 		end)
 		rows[i] = row
+		return row
+	end
+	function Sync()
+		local current = get()
+		local items = type(options) == "function" and options() or options
+		value:SetText(current ~= nil and labelFor(current) or "")
+		for i, option in ipairs(items) do
+			local row = rows[i] or MakeRow(i)
+			row.option = option
+			row.text:SetText(labelFor(option))
+			row.check:SetShown(option == current)
+			row:Show()
+		end
+		for i = #items + 1, #rows do rows[i]:Hide() end
+		list:SetSize(width, math.max(1, #items) * DROPDOWN_ROW + 10)
 	end
 
 	button:SetScript("OnClick", function()
@@ -892,16 +1069,34 @@ local function BuildPreview(pane)
 
 	preview.mob = CreateIcon()
 	preview.mob:SetParent(plate)
-	preview.mob.plate, preview.mob.isPreview, preview.mob.kind = plate, true, "normal"
+	preview.mob.plate, preview.mob.isPreview, preview.mob.kind, preview.mob.progressValue = plate, true, "normal", "8/12"
 	preview.object = CreateIcon()
 	preview.object:SetParent(item)
 	preview.object.plate, preview.object.isPreview, preview.object.isObject, preview.object.kind = item, true, true, "normal"
-	preview.box = box
+	preview.box, preview.plate, preview.bar = box, plate, bar
 	box:SetScript("OnShow", function() UpdatePreview() end)
+end
+
+-- The fake nameplate copies a real one measured in the world (size, scale, health bar), so what
+-- you set in the preview looks the same on real plates. previewRatio turns real plate units into
+-- preview units; the mob icon is scaled by it as well.
+local function ApplyPlateGeometry()
+	local geom, ratio = root and root.plateGeom, 1
+	if geom and geom.eff then ratio = geom.eff / preview.box:GetEffectiveScale() end
+	if geom then
+		preview.plate:SetSize(geom.w * ratio, geom.h * ratio)
+		if geom.barW then
+			preview.bar:SetSize(geom.barW * ratio, geom.barH * ratio)
+			preview.bar:ClearAllPoints()
+			preview.bar:SetPoint("TOP", preview.plate, "TOP", 0, -geom.barTop * ratio)
+		end
+	end
+	preview.mob.previewRatio = ratio
 end
 
 function UpdatePreview()
 	if not (preview.box and db) then return end
+	ApplyPlateGeometry()
 	for _, f in ipairs({ preview.mob, preview.object }) do
 		-- The icons are created at LOW strata: lift them into the options window.
 		f:SetFrameStrata(preview.box:GetFrameStrata())
@@ -925,6 +1120,7 @@ local function Bob(f, now)
 	local period = 2 * db.bounceSpeed
 	local wave = (1 - math.cos((now + f.phase) * 2 * math.pi / period)) / 2
 	f.inner:SetPoint("CENTER", f, "CENTER", 0, wave * db.bounceHeight)
+	if db.progressFloat and f.text:IsShown() then PlaceText(f, wave) end
 end
 
 local bobber = CreateFrame("Frame")
@@ -1026,11 +1222,14 @@ end
 
 local LEFT, TOP = 16, -96
 local OPTIONS_WIDTH = 404 -- the tabbed box on the left
+local PREVIEW_WIDTH, PREVIEW_HEIGHT = 240, 340 -- the preview window
 
 -- Settings each tab owns, for its "Reset this tab" button.
-local DISPLAY_KEYS = { "active", "enabled", "objects", "scale", "offsetX", "offset", "objectScale", "objectOffset" }
+local DISPLAY_KEYS = { "active", "enabled", "objects", "scale", "offsetX", "offset", "objectScale", "objectOffsetX", "objectOffset" }
 local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "glowAlpha" }
-local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle" }
+local PROGRESS_KEYS = { "progress", "progressAttach", "progressFloat", "progressSize", "progressFont",
+	"progressOutline", "progressColor", "progressX", "progressY" }
+local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice" }
 
 local function ResetKeys(keys)
 	for _, key in ipairs(keys) do db[key] = DEFAULTS[key] end
@@ -1042,11 +1241,13 @@ local function AfterReset()
 	ApplySettings()
 end
 
+-- Sections share one scrolling page; each has a heading row with its own small reset button.
+local SECTION_HEADER = 34
 local function AddResetTabButton(tab, onReset)
 	local b = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
-	b:SetSize(200, 24)
-	b:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 16, 16)
-	Loc(b, "RESET_TAB")
+	b:SetSize(130, 20)
+	b:SetPoint("TOPLEFT", tab, "TOPLEFT", LEFT + 200, TOP + SECTION_HEADER - 6)
+	Loc(b, "RESET_SECTION")
 	b:SetScript("OnClick", function()
 		onReset()
 		AfterReset()
@@ -1060,6 +1261,7 @@ local function ItemsOn() return db.active and db.objects end
 local function AnyIconOn() return db.active and (db.enabled or db.objects) end
 local function FloatOn() return AnyIconOn() and db.bounce end
 local function GlowOn() return AnyIconOn() and db.glow end
+local function ProgressOn() return MobsOn() and db.progress end
 
 local function GateCheck(condition, check)
 	Gate(condition, check, check.labelFS, check.noteFS)
@@ -1073,13 +1275,42 @@ local function BuildDisplayTab(tab)
 	local y = TOP - 58
 	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_MOBS", "enabled", LEFT, y))
 	Gate(MobsOn, AddSlider(tab, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, LEFT + 4, y - 22, "%.2f"))
-	Gate(MobsOn, AddSlider(tab, "HORIZONTAL", "offsetX", -80, 80, 1, LEFT + 4, y - 62, "%d"))
-	Gate(MobsOn, AddSlider(tab, "HEIGHT_PLATE", "offset", -40, 80, 1, LEFT + 4, y - 102, "%d"))
+	Gate(MobsOn, AddSlider(tab, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, y - 62, "%d"))
+	Gate(MobsOn, AddSlider(tab, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, y - 102, "%d"))
 
 	y = y - 158
 	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_ITEMS", "objects", LEFT, y))
 	Gate(ItemsOn, AddSlider(tab, "ICON_SIZE", "objectScale", 0.5, 3.0, 0.05, LEFT + 4, y - 22, "%.2f"))
-	Gate(ItemsOn, AddSlider(tab, "HEIGHT_ITEM", "objectOffset", -40, 80, 1, LEFT + 4, y - 62, "%d"))
+	Gate(ItemsOn, AddSlider(tab, "POS_X", "objectOffsetX", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, y - 62, "%d"))
+	Gate(ItemsOn, AddSlider(tab, "POS_Y", "objectOffset", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, y - 102, "%d"))
+end
+
+-- The objective count ("8/12") next to quest mobs: everything about it is its own.
+local function BuildProgressTab(tab)
+	AddResetTabButton(tab, function() ResetKeys(PROGRESS_KEYS) end)
+	GateCheck(MobsOn, AddCheck(tab, "PROGRESS", "PROGRESS_TIP", "progress", LEFT, TOP))
+	GateCheck(ProgressOn, AddCheck(tab, "PROGRESS_ATTACH", "PROGRESS_ATTACH_TIP", "progressAttach", LEFT, TOP - 48))
+	-- Floating with the icon needs the icon's own Float (Icon tab).
+	GateCheck(function() return ProgressOn() and db.bounce end,
+		AddCheck(tab, "PROGRESS_FLOAT", "PROGRESS_FLOAT_TIP", "progressFloat", LEFT, TOP - 96))
+	Gate(ProgressOn, AddSlider(tab, "TEXT_SIZE", "progressSize", 8, 32, 1, LEFT + 4, TOP - 156, "%d"))
+	-- Attached, the text is glued to the icon: X/Y only apply when it stands on its own.
+	local function FreeTextOn() return ProgressOn() and not db.progressAttach end
+	Gate(FreeTextOn, AddSlider(tab, "POS_X", "progressX", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, TOP - 196, "%d"))
+	Gate(FreeTextOn, AddSlider(tab, "POS_Y", "progressY", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, TOP - 236, "%d"))
+
+	-- Formatting: font and outline side by side, colour below.
+	local function Choice(key) return function() return db[key] end end
+	local function SetChoice(key) return function(value) db[key] = value; ApplySettings() end end
+	Gate(ProgressOn, AddDropdown(tab, "TEXT_FONT", TEXT_FONT_ORDER,
+		function(value) return L["FONT_" .. value] end, Choice("progressFont"), SetChoice("progressFont"),
+		LEFT + 4, TOP - 282, 165))
+	Gate(ProgressOn, AddDropdown(tab, "TEXT_OUTLINE", { "none", "thin", "thick" },
+		function(value) return L["OUTLINE_" .. value] end, Choice("progressOutline"), SetChoice("progressOutline"),
+		LEFT + 180, TOP - 282, 165))
+	Gate(ProgressOn, AddDropdown(tab, "TEXT_COLOR", { "white", "gold", "green", "kind" },
+		function(value) return L["COLOR_" .. value] end, Choice("progressColor"), SetChoice("progressColor"),
+		LEFT + 4, TOP - 336, 165))
 end
 
 local function BuildIconTab(tab)
@@ -1121,141 +1352,158 @@ local function BuildBehaviorTab(tab)
 		function() return root.language end,
 		function(code) root.language = code; L = BuildLocale(code); Relabel() end,
 		LEFT + 4, TOP - 164)
+
+	-- Sound when an objective completes: on/off, which sound, and a button to hear it.
+	local function SoundOn() return AddonOn() and db.sound end
+	GateCheck(AddonOn, AddCheck(tab, "SOUND", "SOUND_TIP", "sound", LEFT, TOP - 222))
+	Gate(SoundOn, AddDropdown(tab, "SOUND_CHOICE", QUEST_SOUND_ORDER,
+		function(value) return L["SOUND_" .. value] end,
+		function() return db.soundChoice end,
+		function(value) db.soundChoice = value; PlayQuestSound() end,
+		LEFT + 4, TOP - 270, 165))
+	local test = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
+	test:SetSize(80, 22)
+	test:SetPoint("TOPLEFT", LEFT + 180, TOP - 289)
+	Loc(test, "SOUND_TEST")
+	test:SetScript("OnClick", PlayQuestSound)
+	Gate(SoundOn, test)
 end
 
-local MAX_PROFILE_ROWS = 10
-local PROFILE_LIST_WIDTH = 170
-local PROFILE_ACTIONS_X = LEFT + PROFILE_LIST_WIDTH + 14
-local PROFILE_ACTIONS_WIDTH = 190
+-- Profiles tab in the Ace3 layout players know from RareScanner and many others: intro, reset,
+-- current profile, New + Existing profiles, Copy From, Delete a Profile (with a confirmation).
+local PROFILE_TEXT_WIDTH = OPTIONS_WIDTH - 36
+local DELETE_POPUP = "CSCODER_QUESTINDICATOR_DELETE_PROFILE"
+
+local function OtherProfiles()
+	local names = {}
+	for _, name in ipairs(ProfileNames()) do
+		if name ~= ActiveProfileName() then names[#names + 1] = name end
+	end
+	return names
+end
+
+-- Characters on a deleted profile fall back to "Default" (or the first one) on their next login.
+local function DeleteProfile(name)
+	if not root.profiles[name] or name == ActiveProfileName() then return end
+	root.profiles[name] = nil
+	for character, profile in pairs(root.chars) do
+		if profile == name then root.chars[character] = nil end
+	end
+	RefreshControls()
+end
+
+local function ConfirmDelete(name)
+	local popups, show = _G.StaticPopupDialogs, _G.StaticPopup_Show
+	if not (popups and show) then DeleteProfile(name) return end
+	popups[DELETE_POPUP] = {
+		text = L.PROF_DELETE_CONFIRM,
+		button1 = _G.YES or "Yes",
+		button2 = _G.NO or "No",
+		OnAccept = function(_, data) DeleteProfile(data) end,
+		timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+	}
+	show(DELETE_POPUP, name, nil, name)
+end
 
 local function BuildProfilesTab(tab)
-	local active = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-	active:SetPoint("TOPLEFT", LEFT, TOP)
-	active:SetWidth(OPTIONS_WIDTH - 30)
-	active:SetJustifyH("LEFT")
-	local tip = tab:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	tip:SetPoint("TOPLEFT", LEFT, TOP - 18)
-	Loc(tip, "PROFILES_TIP")
-
-	local rows = {}
-	for i = 1, MAX_PROFILE_ROWS do
-		local row = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
-		row:SetSize(PROFILE_LIST_WIDTH, 22)
-		row:SetPoint("TOPLEFT", LEFT, TOP - 40 - (i - 1) * 25)
-		row:SetScript("OnClick", function(self) UseProfile(self.profileName) end)
-		rows[i] = row
+	local function Desc(key, y)
+		local fs = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		fs:SetPoint("TOPLEFT", LEFT, y)
+		fs:SetWidth(PROFILE_TEXT_WIDTH)
+		fs:SetJustifyH("LEFT")
+		return Loc(fs, key)
 	end
+	local function Name(name) return name end
+	local function Nothing() return nil end
 
-	local x = PROFILE_ACTIONS_X
-	AddHeading(tab, "PROFILE_NAME", x, TOP - 40)
-	local input = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
-	input:SetSize(PROFILE_ACTIONS_WIDTH - 8, 22)
-	input:SetPoint("TOPLEFT", x + 6, TOP - 58)
-	input:SetAutoFocus(false)
-	input:SetMaxLetters(32)
-	input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-	input:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+	Desc("PROF_INTRO", TOP)
 
-	local message = tab:CreateFontString(nil, "ARTWORK", "GameFontRedSmall")
-	message:SetPoint("TOPLEFT", x, TOP - 290)
-	message:SetWidth(PROFILE_ACTIONS_WIDTH)
-	message:SetJustifyH("LEFT")
-	local function Say(key) message:SetText(key and L[key] or "") end
-
-	local function TypedName()
-		local name = (input:GetText() or ""):match("^%s*(.-)%s*$")
-		if name == "" then Say("ERR_NAME_EMPTY") return nil end
-		if root.profiles[name] then Say("ERR_NAME_TAKEN") return nil end
-		return name
-	end
-
-	local function AddButton(key, y, onClick)
-		local b = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
-		b:SetSize(PROFILE_ACTIONS_WIDTH, 24)
-		b:SetPoint("TOPLEFT", x, y)
-		Loc(b, key)
-		b:SetScript("OnClick", onClick)
-		return b
-	end
-
-	AddButton("NEW_PROFILE", TOP - 88, function()
-		local name = TypedName()
-		if not name then return end
-		root.profiles[name] = FillDefaults({})
-		input:SetText(""); Say(nil)
-		UseProfile(name)
-	end)
-	AddButton("COPY_PROFILE", TOP - 116, function()
-		local name = TypedName()
-		if not name then return end
-		root.profiles[name] = FillDefaults(CopySettings(db))
-		input:SetText(""); Say(nil)
-		UseProfile(name)
-	end)
-	AddButton("RENAME_PROFILE", TOP - 144, function()
-		local name = TypedName()
-		if not name then return end
-		local old = ActiveProfileName()
-		root.profiles[name], root.profiles[old] = root.profiles[old], nil
-		for character, profile in pairs(root.chars) do
-			if profile == old then root.chars[character] = name end
-		end
-		input:SetText(""); Say(nil)
-		UseProfile(name)
-	end)
-
-	local armed = false
-	local deleteButton
-	deleteButton = AddButton("DELETE_PROFILE", TOP - 184, function(self)
-		if #ProfileNames() <= 1 then Say("ERR_LAST_PROFILE") return end
-		if not armed then
-			armed = true
-			self:SetText(L.CONFIRM_DELETE)
-			C_Timer.After(3, function()
-				if armed then armed = false; deleteButton:SetText(L.DELETE_PROFILE) end
-			end)
-			return
-		end
-		armed = false
-		self:SetText(L.DELETE_PROFILE)
-		local old = ActiveProfileName()
-		root.profiles[old] = nil
-		local fallback = root.profiles[DEFAULT_PROFILE] and DEFAULT_PROFILE or ProfileNames()[1]
-		for character, profile in pairs(root.chars) do
-			if profile == old then root.chars[character] = fallback end
-		end
-		Say(nil)
-		UseProfile(fallback)
-	end)
-
-	-- Everything in the active profile back to defaults, plus the language.
-	AddButton("RESET_ALL", TOP - 236, function()
+	Desc("PROF_RESET_DESC", TOP - 24)
+	local reset = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
+	reset:SetSize(160, 22)
+	reset:SetPoint("TOPLEFT", LEFT, TOP - 42)
+	Loc(reset, "PROF_RESET")
+	reset:SetScript("OnClick", function()
 		for key, value in pairs(DEFAULTS) do db[key] = value end
-		root.language = "auto"
-		L = BuildLocale("auto")
-		Say(nil)
-		Relabel()
 		AfterReset()
 	end)
 
+	local current = tab:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	current:SetPoint("TOPLEFT", LEFT, TOP - 80)
+
+	Desc("PROF_CHOOSE_DESC", TOP - 106)
+	AddHeading(tab, "PROF_NEW", LEFT, TOP - 126)
+	local input = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
+	input:SetSize(168, 22)
+	input:SetPoint("TOPLEFT", LEFT + 6, TOP - 144)
+	input:SetAutoFocus(false)
+	input:SetMaxLetters(32)
+	input:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+	input:SetScript("OnEnterPressed", function(self)
+		local name = (self:GetText() or ""):match("^%s*(.-)%s*$")
+		self:SetText("")
+		self:ClearFocus()
+		if name == "" then return end
+		if not root.profiles[name] then root.profiles[name] = FillDefaults({}) end
+		UseProfile(name)
+	end)
+	AddDropdown(tab, "PROF_CHOOSE", ProfileNames, Name, ActiveProfileName, UseProfile, LEFT + 196, TOP - 126, 180)
+
+	Desc("PROF_COPY_DESC", TOP - 186)
+	AddDropdown(tab, "PROF_COPY", OtherProfiles, Name, Nothing, function(name)
+		local source = root.profiles[name]
+		if not source then return end
+		for key in pairs(DEFAULTS) do db[key] = source[key] end
+		AfterReset()
+	end, LEFT + 4, TOP - 206, 180)
+
+	Desc("PROF_DELETE_DESC", TOP - 266)
+	AddDropdown(tab, "PROF_DELETE", OtherProfiles, Name, Nothing, ConfirmDelete, LEFT + 4, TOP - 286, 180)
+
 	local function Sync()
-		local current = ActiveProfileName()
-		active:SetText(string.format(L.ACTIVE_PROFILE, "|cffffd200" .. tostring(current) .. "|r"))
-		local names = ProfileNames()
-		for i, row in ipairs(rows) do
-			local name = names[i]
-			row.profileName = name
-			if name then
-				row:SetText(name == current and ("> " .. name .. " <") or name)
-				if name == current then row:LockHighlight() else row:UnlockHighlight() end
-				row:Show()
-			else
-				row:Hide()
-			end
-		end
+		current:SetText(L.PROF_CURRENT .. " |cffffffff" .. tostring(ActiveProfileName()) .. "|r")
 	end
 	refreshers[#refreshers + 1] = Sync
 	tab:HookScript("OnShow", Sync)
+end
+
+-- All settings on one scrolling page, in sections (Profiles keeps its own tab). Each builder
+-- places its controls from (LEFT, TOP) as on a full panel, so a section frame is shifted to put
+-- TOP right under its heading.
+local SETTINGS_SECTIONS = {
+	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 356 },
+	{ key = "TAB_ICON", build = BuildIconTab, height = 260 },
+	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 382 },
+	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 314 },
+}
+local SECTION_GAP = 16
+local CONTENT_WIDTH = OPTIONS_WIDTH - 34
+
+local function BuildSettingsTab(tab, box)
+	local scroll = CreateFrame("ScrollFrame", nil, tab, "UIPanelScrollFrameTemplate")
+	scroll:SetPoint("TOPLEFT", box, "TOPLEFT", 4, -8)
+	scroll:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -26, 6)
+	local content = CreateFrame("Frame", nil, scroll)
+	content:SetWidth(CONTENT_WIDTH)
+	scroll:SetScrollChild(content)
+	settingsScroll = scroll
+
+	local y = 0
+	for _, s in ipairs(SETTINGS_SECTIONS) do
+		local section = CreateFrame("Frame", nil, content)
+		section:SetSize(CONTENT_WIDTH, 1)
+		section:SetPoint("TOPLEFT", content, "TOPLEFT", -12, -(y + SECTION_HEADER) - TOP)
+		local heading = section:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+		heading:SetPoint("TOPLEFT", section, "TOPLEFT", LEFT, TOP + SECTION_HEADER - 8)
+		Loc(heading, s.key)
+		local line = section:CreateTexture(nil, "ARTWORK")
+		line:SetColorTexture(1, 0.82, 0, 0.25)
+		line:SetSize(CONTENT_WIDTH - 24, 1)
+		line:SetPoint("TOPLEFT", section, "TOPLEFT", LEFT, TOP + 6)
+		s.build(section)
+		y = y + SECTION_HEADER + s.height + SECTION_GAP
+	end
+	content:SetHeight(y)
 end
 
 local function BuildPanel()
@@ -1264,27 +1512,76 @@ local function BuildPanel()
 	header:SetText(TITLE)
 	local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	sub:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -6)
-	sub:SetPoint("RIGHT", panel, "RIGHT", -16, 0)
+	sub:SetPoint("RIGHT", panel, "RIGHT", -140, 0)
 	sub:SetJustifyH("LEFT")
 	Loc(sub, "DESC")
 
-	-- Options box on the left, in the Ace3 tab style players know (BlizzMove and many others):
+	-- Options box over the whole panel, in the Ace3 tab style players know (BlizzMove and many others):
 	-- the game's options-frame tab textures on top of a bordered pane, tabs stretched to fill it.
 	local box = CreateFrame("Frame", nil, panel, BackdropTemplateMixin and "BackdropTemplate" or nil)
 	box:SetPoint("TOPLEFT", 8, -84)
-	box:SetPoint("BOTTOMLEFT", 8, 8)
-	box:SetWidth(OPTIONS_WIDTH)
+	box:SetPoint("BOTTOMRIGHT", -8, 8)
 	if box.SetBackdrop then
 		box:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 16, insets = { left = 3, right = 3, top = 5, bottom = 3 } })
 		box:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
 		box:SetBackdropBorderColor(0.4, 0.4, 0.4)
 	end
 
-	-- Preview on the right, outside the tabs.
-	local pane = CreateFrame("Frame", nil, panel)
-	pane:SetPoint("TOPLEFT", box, "TOPRIGHT", 10, 20)
-	pane:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -10, 8)
+	-- The preview lives in its own small window (movable, closable), so the options get the whole
+	-- panel. It opens with the options and closes with them; the Preview button toggles it.
+	local window = CreateFrame("Frame", ADDON .. "PreviewWindow", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+	window:SetSize(PREVIEW_WIDTH, PREVIEW_HEIGHT)
+	window:SetFrameStrata("DIALOG")
+	window:SetClampedToScreen(true)
+	window:SetMovable(true)
+	window:EnableMouse(true)
+	window:RegisterForDrag("LeftButton")
+	window:SetScript("OnDragStart", window.StartMoving)
+	window:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		local point, _, relativePoint, x, y = self:GetPoint()
+		root.previewPos = { point, relativePoint, x, y }
+	end)
+	if window.SetBackdrop then
+		window:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
+	end
+	local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
+	close:SetPoint("TOPRIGHT", -2, -2)
+	close:SetScript("OnClick", function() root.previewHidden = true; window:Hide() end)
+	local pane = CreateFrame("Frame", nil, window)
+	pane:SetPoint("TOPLEFT", 14, -12)
+	pane:SetPoint("BOTTOMRIGHT", -14, 14)
 	BuildPreview(pane)
+	window:Hide()
+
+	local function PlaceWindow()
+		window:ClearAllPoints()
+		local pos = root.previewPos
+		if pos then
+			window:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+		else
+			window:SetPoint("TOPLEFT", panel, "TOPRIGHT", 12, 0) -- first time: beside the options
+		end
+	end
+	panel:HookScript("OnShow", function()
+		if not root.previewHidden then PlaceWindow(); window:Show() end
+	end)
+	panel:HookScript("OnHide", function() window:Hide() end)
+
+	local toggle = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+	toggle:SetSize(110, 22)
+	toggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -16, -14)
+	Loc(toggle, "PREVIEW")
+	toggle:SetScript("OnClick", function()
+		if window:IsShown() then
+			root.previewHidden = true
+			window:Hide()
+		else
+			root.previewHidden = false
+			PlaceWindow()
+			window:Show()
+		end
+	end)
 
 	local TAB_ACTIVE = "Interface\\OptionsFrame\\UI-OptionsFrame-ActiveTab"
 	local TAB_INACTIVE = "Interface\\OptionsFrame\\UI-OptionsFrame-InActiveTab"
@@ -1307,13 +1604,12 @@ local function BuildPanel()
 		return { left, middle, right }
 	end
 
-	local builders = { BuildDisplayTab, BuildIconTab, BuildBehaviorTab, BuildProfilesTab }
-	local keys = { "TAB_DISPLAY", "TAB_ICON", "TAB_BEHAVIOR", "TAB_PROFILES" }
+	local builders = { BuildSettingsTab, BuildProfilesTab }
+	local keys = { "TAB_SETTINGS", "TAB_PROFILES" }
 	local tabs, frames = {}, {}
 	local selected = 1
 	local TAB_OVERLAP = 10
-	-- Equal widths that fill the box, as Ace3 does.
-	local tabWidth = math.floor((OPTIONS_WIDTH - 8 + TAB_OVERLAP * (#builders - 1)) / #builders)
+	local tabWidth = 100 -- until LayoutTabs measures the labels
 
 	local function SelectTab(index)
 		selected = index
@@ -1355,8 +1651,19 @@ local function BuildPanel()
 		frame:SetPoint("TOPLEFT", panel, "TOPLEFT")
 		frame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT")
 		frames[i] = frame
-		build(frame)
+		build(frame, box)
 	end
+
+	-- Each tab is as wide as its label (Ace3 style), so translations never squeeze or cut it.
+	function LayoutTabs()
+		for _, tab in ipairs(tabs) do
+			local width = math.max(80, math.floor(tab.text:GetStringWidth() + 44))
+			tab:SetWidth(width)
+			tab.active[2]:SetWidth(width - 40)
+			tab.inactive[2]:SetWidth(width - 40)
+		end
+	end
+	LayoutTabs()
 	panel:HookScript("OnShow", function() SelectTab(selected) end)
 	SelectTab(1)
 
@@ -1382,6 +1689,33 @@ end
 -- Events
 ---------------------------------------------------------------------------------------------
 
+-- Measures a real enemy nameplate (size, effective scale, health bar) for the preview. Saved, so
+-- the preview is right even before a plate shows up in a new session.
+local plateMeasured = false
+
+local function MeasurePlate(unit)
+	if plateMeasured or not (root and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
+	local plate = C_NamePlate.GetNamePlateForUnit(unit)
+	if not plate then return end
+	local w, h = plate:GetSize()
+	local eff = plate:GetEffectiveScale()
+	if not (w and h and eff) or w <= 0 or h <= 0 then return end
+	local geom = { w = w, h = h, eff = eff }
+	local frame = plate.UnitFrame
+	local bar = frame and (frame.healthBar or frame.HealthBar
+		or (frame.HealthBarsContainer and frame.HealthBarsContainer.healthBar))
+	local plateTop, barTop = plate:GetTop(), bar and bar.GetTop and bar:GetTop()
+	if bar and plateTop and barTop then
+		local bw, bh = bar:GetSize()
+		local barEff = bar:GetEffectiveScale()
+		geom.barW, geom.barH = bw * barEff / eff, bh * barEff / eff
+		geom.barTop = (plateTop * eff - barTop * barEff) / eff
+	end
+	root.plateGeom = geom
+	plateMeasured = true
+	if UpdatePreview then UpdatePreview() end
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
@@ -1405,7 +1739,14 @@ events:SetScript("OnEvent", function(_, event, arg1)
 	end
 	if not db then return end
 	if event == "NAME_PLATE_UNIT_ADDED" then
-		if arg1 ~= SOFT then Refresh(arg1) end
+		if arg1 ~= SOFT then
+			Refresh(arg1)
+			-- Enemy plates are what the preview imitates; measure one per session once it is laid out.
+			if not plateMeasured and UnitCanAttack and UnitCanAttack("player", arg1) then
+				local unit = arg1
+				C_Timer.After(0.2, function() MeasurePlate(unit) end)
+			end
+		end
 		RefreshSoftObject()
 	elseif event == "NAME_PLATE_UNIT_REMOVED" then
 		HideIcon(arg1)
