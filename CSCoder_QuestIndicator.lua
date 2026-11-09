@@ -976,11 +976,12 @@ local function AddCheck(parent, labelKey, tipKey, settingKey, x, y)
 	return check
 end
 
--- Always 2 decimals ("12,00", "1,50", "1,25"), with the decimal comma in every panel language
--- except English.
-local function FormatNumber(value)
-	local text = string.format("%.2f", value)
-	if text == "-0.00" then text = "0.00" end
+-- 2 decimals ("1,50", "1,25"), none on whole-number sliders ("12"), with the decimal comma in
+-- every panel language except English.
+local function FormatNumber(value, step)
+	local whole = step and step >= 1 and step % 1 == 0
+	local text = whole and string.format("%d", math.floor(value + 0.5)) or string.format("%.2f", value)
+	if text == "-0.00" then text = "0.00" elseif text == "-0" then text = "0" end
 	local lang = root and root.language
 	if lang == nil or lang == "auto" then lang = GetLocale() end
 	if lang ~= "enUS" and lang ~= "enGB" then text = text:gsub("%.", ",") end
@@ -1012,7 +1013,7 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 	input:SetFontObject("GameFontHighlightSmall")
 	-- Text set while the box is hidden stays scrolled to its end and looks empty: rewind it.
 	local function ShowValue(value)
-		input:SetText(FormatNumber(value))
+		input:SetText(FormatNumber(value, step))
 		input:SetCursorPosition(0)
 	end
 	input:SetScript("OnShow", function() ShowValue(db[settingKey]) end)
