@@ -596,6 +596,30 @@ local function PlayQuestSound()
 	if PlaySound then pcall(PlaySound, id, "Master") end
 end
 
+-- TEMPORARY: /cqi sound plays candidate sounds one by one, to pick a better list for the menu
+-- (some may not exist on this client and stay silent). Remove once the list is chosen.
+local SoundAudition
+do
+	local candidates = {
+		{ 878, "Quest complete" }, { 875, "Quest log open" }, { 847, "Quest failed" }, { 888, "Level up" },
+		{ 8960, "Ready check" }, { 8959, "Raid warning" }, { 3175, "Map ping" }, { 3081, "Whisper" },
+		{ 12867, "Alarm clock 2" }, { 12889, "Alarm clock 3" }, { 416, "Murloc" }, { 120, "Coins" },
+		{ 5274, "Auction house open" }, { 8458, "PvP queue" }, { 8459, "PvP queue ready" }, { 880, "Group invite" },
+		{ 18019, "Battle.net toast" }, { 31578, "Epic loot toast" }, { 44295, "World quest complete" },
+		{ 23404, "Dig site complete" }, { 12891, "Achievement" }, { 3337, "Mail" }, { 1204, "Auction close" },
+		{ 6674, "Bell toll" },
+	}
+	local index = 0
+	function SoundAudition(arg)
+		index = tonumber(arg) or (index % #candidates + 1)
+		local c = candidates[index]
+		if not c then return end
+		if PlaySound then pcall(PlaySound, c[1], "Master") end
+		print(string.format("|cffffd200%s|r sound %d/%d: %s (%d). Type /cqi sound for the next one, or /cqi sound <number>.",
+			TITLE, index, #candidates, c[2], c[1]))
+	end
+end
+
 local function RebuildObjectiveTexts()
 	wipe(objectiveTexts)
 	if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then return end
@@ -2410,6 +2434,8 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 		ApplySettings()
 		RefreshControls()
 		print("|cffffd200" .. TITLE .. "|r " .. (db.active and L.ON or L.OFF))
+	elseif cmd == "sound" then
+		SoundAudition((msg or ""):match("^%S+%s+(%d+)"))
 	elseif cmd == "setup" then
 		ShowWizard()
 	elseif cmd == "plate" then
