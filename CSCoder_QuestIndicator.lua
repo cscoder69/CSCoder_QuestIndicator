@@ -976,11 +976,11 @@ local function AddCheck(parent, labelKey, tipKey, settingKey, x, y)
 	return check
 end
 
--- Up to 2 decimals, trailing zeros dropped ("12", "1,5", "1,25"), with the decimal comma in
--- every panel language except English.
+-- Always 2 decimals ("12,00", "1,50", "1,25"), with the decimal comma in every panel language
+-- except English.
 local function FormatNumber(value)
-	local text = string.format("%.2f", value):gsub("0+$", ""):gsub("%.$", "")
-	if text == "-0" then text = "0" end
+	local text = string.format("%.2f", value)
+	if text == "-0.00" then text = "0.00" end
 	local lang = root and root.language
 	if lang == nil or lang == "auto" then lang = GetLocale() end
 	if lang ~= "enUS" and lang ~= "enGB" then text = text:gsub("%.", ",") end
