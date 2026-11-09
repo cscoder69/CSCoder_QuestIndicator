@@ -15,7 +15,7 @@ local DEFAULTS = {
 	active = true,       -- master switch: the whole addon on or off
 	enabled = true,      -- icons over quest mobs
 	objects = true,      -- icon over the soft-targeted quest object in the world
-	style = "gold",      -- icon style (file in icons\)
+	style = "standard/classic_gold", -- icon style: "category/name" (file in icons\)
 	scale = 1.5,         -- mob icon size
 	offsetX = 0,         -- mob icon X
 	offset = -15,        -- mob icon Y (above the nameplate)
@@ -28,7 +28,9 @@ local DEFAULTS = {
 	progressSize = 13,   -- its font size
 	progressFont = "friz",     -- key in TEXT_FONTS
 	progressOutline = "thin",  -- "none", "thin", "thick"
-	progressColor = "white",   -- "white", "gold", "green" or "kind" (same colour as the icon)
+	progressColor = "white",   -- "white", "gold", "green", "kind" (same colour as the icon) or "progress" (red to green)
+	progressFormat = "slash",  -- "slash" 8/12, "spaced" 8 / 12, "both" 8/12 (67%), "percent" 67%, "left" 4 left
+	progressShadow = false,   -- drop shadow behind the text
 	progressX = 36,      -- its X
 	progressY = 0,       -- its Y
 	bounce = true,       -- floating up/down animation
@@ -49,20 +51,58 @@ local SETTINGS_VERSION = 5
 local DEFAULT_PROFILE = "Default"
 
 local ICON_DIR = "Interface\\AddOns\\CSCoder_QuestIndicator\\icons\\"
-local ICON_STYLES = { "gold", "blue", "red", "badge", "pixel" }
+-- Icon styles, in three categories (one row each in the picker). A style key is
+-- "category/name", the file icons\category\name.tga.
+local ICON_CATEGORIES = {
+	{ key = "standard", sample = "standard/classic_gold", icons = {
+		"classic_gold", "classic_blue", "classic_red", "classic_badge", "classic_pixel", -- the original five
+		"yellow", "blue", "red", "green", "purple", "orange",
+		"circle_yellow", "circle_blue", "circle_red", "circle_green", "circle_purple", "shield_yellow", "shield_blue", "shield_red" } },
+	{ key = "themed", sample = "themed/laurels", icons = { "laurels", "horde", "alliance", "banner", "scroll", "sign",
+		"gear", "crystal", "leaves", "arcane", "stone" } },
+	{ key = "states", sample = "states/highlight", icons = { "highlight", "ring", "signal", "orbit", "white", "alert",
+		"fire", "bright", "inactive", "blocked", "hourglass", "refresh" } },
+}
+local VALID_STYLE = {}
+for _, category in ipairs(ICON_CATEGORIES) do
+	for _, name in ipairs(category.icons) do VALID_STYLE[category.key .. "/" .. name] = true end
+end
+local DEFAULT_STYLE = "standard/classic_gold"
+-- Style keys from before the categories (v1.0-1.2): the same five icons, now "classic".
+local OLD_STYLES = { gold = "standard/classic_gold", blue = "standard/classic_blue", red = "standard/classic_red",
+	badge = "standard/classic_badge", pixel = "standard/classic_pixel" }
+-- "Color by quest type": styles that come in colours swap to their blue (daily) or red (group)
+-- sibling; the rest get tinted.
+local KIND_SIBLING = {}
+for _, family in ipairs({
+	{ prefix = "standard/classic_", names = { "gold", "blue", "red" } },
+	{ prefix = "standard/", names = { "yellow", "blue", "red", "green", "purple", "orange" } },
+	{ prefix = "standard/circle_", names = { "yellow", "blue", "red", "green", "purple" } },
+	{ prefix = "standard/shield_", names = { "yellow", "blue", "red" } },
+}) do
+	for _, name in ipairs(family.names) do
+		KIND_SIBLING[family.prefix .. name] = { daily = family.prefix .. "blue", group = family.prefix .. "red" }
+	end
+end
+
+local function IconPath(style)
+	return ICON_DIR .. (style or DEFAULT_STYLE):gsub("/", "\\")
+end
 local GLOW_TEXTURE = "Interface\\Cooldown\\star4"
 local RECHECK_SECONDS = 1.0 -- tooltip data can arrive a moment after the plate appears
 local SOFT = "softinteract"  -- the game's interaction soft target (one world object)
 local FADE_ALPHA = 0.35
 local KIND_TINT = { daily = { 0.55, 0.8, 1 }, group = { 1, 0.5, 0.45 } }
-local KIND_STYLE = { daily = "blue", group = "red" }
 -- Progress text formatting: the fonts every client ships, outlines and colours.
 local TEXT_FONTS = { friz = "Fonts\\FRIZQT__.TTF", arial = "Fonts\\ARIALN.TTF", skurri = "Fonts\\skurri.ttf", morpheus = "Fonts\\MORPHEUS.TTF" }
 local TEXT_FONT_ORDER = { "friz", "arial", "skurri", "morpheus" }
+local PROGRESS_FORMATS = { "slash", "spaced", "both", "percent", "left" }
+
 local TEXT_OUTLINES = { none = "", thin = "OUTLINE", thick = "THICKOUTLINE" }
 local TEXT_COLORS = { white = { 1, 1, 1 }, gold = { 1, 0.82, 0 }, green = { 0.3, 1, 0.3 } }
 local KIND_TEXT_COLOR = { normal = { 1, 0.82, 0 }, daily = { 0.55, 0.8, 1 }, group = { 1, 0.5, 0.45 } }
 local POSITION_RANGE = 200 -- X/Y sliders go from -200 to 200
+local SLIDER_WIDTH = 200 -- sliders fit a half-width column with their value box
 
 local root, db, charKey  -- saved variables, active profile, "Name - Realm"
 local L                   -- active language table
@@ -71,6 +111,71 @@ local pool = {}           -- recycled icon frames
 local activeTitles = {}   -- quest title -> kind ("normal", "daily", "group")
 local kindByQuestID = {}  -- questID -> kind
 local inCombat = false
+
+-- Fonts shared by other addons (Plater, ElvUI, WeakAuras, Details... register theirs with
+-- LibSharedMedia). Looked up when needed, since those addons may load after this one; without
+-- it the menu just has the four game fonts. A shared font is saved as "lsm:<name>".
+local function SharedMedia()
+	local stub = _G.LibStub
+	return stub and stub("LibSharedMedia-3.0", true)
+end
+
+local function FontPath(key)
+	if TEXT_FONTS[key] then return TEXT_FONTS[key] end
+	local name = type(key) == "string" and key:match("^lsm:(.+)$")
+	local lsm = name and SharedMedia()
+	return (lsm and lsm:Fetch("font", name, true)) or TEXT_FONTS.friz
+end
+
+local function FontOptions()
+	local list, seen = {}, {}
+	for _, key in ipairs(TEXT_FONT_ORDER) do
+		list[#list + 1] = key
+		seen[TEXT_FONTS[key]:lower()] = true
+	end
+	local lsm = SharedMedia()
+	if lsm then
+		for _, name in ipairs(lsm:List("font") or {}) do
+			local path = lsm:Fetch("font", name, true)
+			if path and not seen[path:lower()] then
+				seen[path:lower()] = true
+				list[#list + 1] = "lsm:" .. name
+			end
+		end
+	end
+	return list
+end
+
+local function FontLabel(key)
+	if TEXT_FONTS[key] then return L["FONT_" .. key] end
+	return (type(key) == "string" and key:match("^lsm:(.+)$")) or tostring(key)
+end
+
+-- The progress as shown, in the chosen format, plus how far along it is (0..1).
+-- raw is "8/12" or "45%" (percentage objectives always show as a percentage).
+local function FormatProgress(raw)
+	local have, need = raw:match("^(%d+)/(%d+)$")
+	if have then
+		have, need = tonumber(have), tonumber(need)
+		local fraction = need > 0 and have / need or 0
+		local percent = math.floor(fraction * 100 + 0.5)
+		local format = db.progressFormat
+		if format == "spaced" then return have .. " / " .. need, fraction end
+		if format == "both" then return string.format("%d/%d (%d%%)", have, need, percent), fraction end
+		if format == "percent" then return percent .. "%", fraction end
+		if format == "left" then return string.format(L.FORMAT_LEFT_N, need - have), fraction end
+		return have .. "/" .. need, fraction
+	end
+	local pct = tonumber(raw:match("^(%d+)%%$") or "")
+	return raw, pct and pct / 100 or 0
+end
+
+-- Red at the start, yellow halfway, green when nearly done.
+local function ProgressColor(fraction)
+	fraction = math.max(0, math.min(1, fraction or 0))
+	if fraction < 0.5 then return { 1, fraction * 2, 0.1 } end
+	return { 1 - (fraction - 0.5) * 2, 1, 0.1 }
+end
 
 -- Quest objects need both the master switch and their own option.
 local function ObjectsOn() return db.active and db.objects end
@@ -252,18 +357,15 @@ local function PlaceText(f, wave)
 end
 
 local function StyleIcon(f)
-	-- Texture and tint: with "color by quest type" the coloured styles swap to blue/red and the
-	-- others are tinted.
+	-- Texture and tint: with "color by quest type" the coloured styles swap to their blue/red
+	-- sibling and the others are tinted.
 	local style, tint = db.style, nil
 	local kind = f.kind or "normal"
-	if db.colorByType and KIND_STYLE[kind] then
-		if style == "gold" or style == "blue" or style == "red" then
-			style = KIND_STYLE[kind]
-		else
-			tint = KIND_TINT[kind]
-		end
+	if db.colorByType and KIND_TINT[kind] then
+		local sibling = KIND_SIBLING[style]
+		if sibling then style = sibling[kind] else tint = KIND_TINT[kind] end
 	end
-	f.icon:SetTexture(ICON_DIR .. style)
+	f.icon:SetTexture(IconPath(style))
 	if tint then f.icon:SetVertexColor(tint[1], tint[2], tint[3]) else f.icon:SetVertexColor(1, 1, 1) end
 
 	local scale = f.isObject and db.objectScale or db.scale
@@ -276,16 +378,30 @@ local function StyleIcon(f)
 	local showText = db.progress and not f.isObject and f.progressValue ~= nil
 	text:SetShown(showText)
 	if showText then
-		local font = TEXT_FONTS[db.progressFont] or TEXT_FONTS.friz
-		text.label:SetFont(font, db.progressSize, TEXT_OUTLINES[db.progressOutline] or "OUTLINE")
-		-- "Icon colour" follows the quest type like the icon does (gold, blue daily, red group).
+		local label = text.label
+		local flags = TEXT_OUTLINES[db.progressOutline] or "OUTLINE"
+		-- A font that fails to load (e.g. a removed shared font) falls back to the game's own.
+		if label:SetFont(FontPath(db.progressFont), db.progressSize, flags) == false then
+			label:SetFont(TEXT_FONTS.friz, db.progressSize, flags)
+		end
+		if db.progressShadow then
+			label:SetShadowColor(0, 0, 0, 1)
+			label:SetShadowOffset(1, -1)
+		else
+			label:SetShadowOffset(0, 0)
+		end
+		local shown, fraction = FormatProgress(f.progressValue)
+		-- "Same as the icon" follows the quest type (gold, blue daily, red group); "By progress"
+		-- goes from red (just started) through yellow to green (almost done).
 		local color = TEXT_COLORS[db.progressColor]
 		if db.progressColor == "kind" then
 			color = db.colorByType and KIND_TEXT_COLOR[f.kind or "normal"] or KIND_TEXT_COLOR.normal
+		elseif db.progressColor == "progress" then
+			color = ProgressColor(fraction)
 		end
 		color = color or TEXT_COLORS.white
-		text.label:SetTextColor(color[1], color[2], color[3])
-		text.label:SetText(f.progressValue)
+		label:SetTextColor(color[1], color[2], color[3])
+		label:SetText(shown)
 		text:SetScale(1 / scale)
 		PlaceText(f, 0)
 	end
@@ -602,6 +718,8 @@ local function FillDefaults(profile)
 		if profile[key] == nil then profile[key] = value end
 	end
 	profile.cursor = nil -- removed option
+	profile.style = OLD_STYLES[profile.style] or profile.style
+	if not VALID_STYLE[profile.style] then profile.style = DEFAULT_STYLE end
 	return profile
 end
 
@@ -733,7 +851,7 @@ local function AddCheck(parent, labelKey, tipKey, settingKey, x, y)
 	Loc(text, labelKey)
 	local note = parent:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	note:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 30, 4)
-	note:SetWidth(268)
+	note:SetWidth(250)
 	note:SetJustifyH("LEFT")
 	if tipKey then Loc(note, tipKey) end
 	local function Sync() check:SetChecked(db[settingKey]) end
@@ -763,7 +881,7 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 	title:SetPoint("TOPLEFT", x, y)
 	local slider = CreateFrame("Slider", nil, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
 	slider:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-	slider:SetSize(240, 16)
+	slider:SetSize(SLIDER_WIDTH, 16)
 	slider:SetOrientation("HORIZONTAL")
 	slider:SetMinMaxValues(low, high)
 	slider:SetValueStep(step)
@@ -874,9 +992,10 @@ end
 -- Dropdown. options: list of values; labelFor(value) -> text; get() / set(value).
 -- Self-made (no UIDropDownMenu): that API differs or is deprecated across WoW clients.
 local DROPDOWN_ROW = 18
+local DROPDOWN_MAX_ROWS = 16 -- longer lists wrap into more columns
 local openList -- the dropdown list currently open, if any
 
-local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, width)
+local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, width, fontFor)
 	width = width or 240
 	local heading = AddHeading(parent, labelKey, x, y)
 	local backdrop = BackdropTemplateMixin and "BackdropTemplate" or nil
@@ -935,19 +1054,32 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, 
 		rows[i] = row
 		return row
 	end
+	-- fontFor(option), when given, draws each entry in its own font (the font menu).
+	local function UseFont(fs, option)
+		if not (fontFor and option ~= nil and fs:SetFont(fontFor(option), 12, "") ~= false) then
+			fs:SetFontObject("GameFontHighlightSmall")
+		end
+	end
 	function Sync()
 		local current = get()
 		local items = type(options) == "function" and options() or options
 		value:SetText(current ~= nil and labelFor(current) or "")
+		UseFont(value, current)
+		-- Long lists (many shared fonts) wrap into columns instead of running off the screen.
+		local columns = math.max(1, math.ceil(#items / DROPDOWN_MAX_ROWS))
 		for i, option in ipairs(items) do
 			local row = rows[i] or MakeRow(i)
 			row.option = option
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", 4 + math.floor((i - 1) / DROPDOWN_MAX_ROWS) * width,
+				-5 - ((i - 1) % DROPDOWN_MAX_ROWS) * DROPDOWN_ROW)
 			row.text:SetText(labelFor(option))
+			UseFont(row.text, option)
 			row.check:SetShown(option == current)
 			row:Show()
 		end
 		for i = #items + 1, #rows do rows[i]:Hide() end
-		list:SetSize(width, math.max(1, #items) * DROPDOWN_ROW + 10)
+		list:SetSize(width * columns, math.max(1, math.min(#items, DROPDOWN_MAX_ROWS)) * DROPDOWN_ROW + 10)
 	end
 
 	button:SetScript("OnClick", function()
@@ -970,45 +1102,176 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, 
 	return button, heading
 end
 
--- Row of clickable icon previews; the selected one gets a highlight frame.
-local function AddStylePicker(parent, x, y)
-	local buttons = {}
-	local function Sync()
-		for _, b in ipairs(buttons) do b.selected:SetShown(b.styleKey == db.style) end
+-- Icon style picker. The panel shows one button with the current icon; it opens a window with
+-- the three categories on the left (each with a sample icon) and that category's icons on the
+-- right. The window stays open while you try icons, so the preview can follow; X or Esc closes.
+local PICKER_COLUMNS, PICKER_CELL = 7, 46
+local iconPicker
+
+local function CategoryOf(style) return (style or DEFAULT_STYLE):match("^(%w+)/") or "standard" end
+
+local function StyleName(style)
+	local name = style and style:match("/(.+)$")
+	return name and L["ICON_" .. name] or ""
+end
+
+local function BuildIconPicker()
+	local backdrop = BackdropTemplateMixin and "BackdropTemplate" or nil
+	local f = CreateFrame("Frame", ADDON .. "IconPicker", UIParent, backdrop)
+	f:SetSize(212 + PICKER_COLUMNS * PICKER_CELL + 24, 226)
+	f:SetFrameStrata("FULLSCREEN_DIALOG")
+	f:SetClampedToScreen(true)
+	f:EnableMouse(true)
+	f:SetMovable(true)
+	f:RegisterForDrag("LeftButton")
+	f:SetScript("OnDragStart", f.StartMoving)
+	f:SetScript("OnDragStop", f.StopMovingOrSizing)
+	if f.SetBackdrop then
+		f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
 	end
-	for i, key in ipairs(ICON_STYLES) do
-		local b = CreateFrame("Button", nil, parent)
-		b:SetSize(40, 40)
-		b:SetPoint("TOPLEFT", x + (i - 1) * 48, y)
-		b.styleKey = key
-		local bg = b:CreateTexture(nil, "BACKGROUND")
+	if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, f:GetName()) end -- Esc closes it
+	local title = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", 20, -18)
+	Loc(title, "ICON_STYLE")
+	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+	close:SetPoint("TOPRIGHT", -4, -4)
+	f:Hide()
+
+	local shownCategory = CategoryOf(db.style)
+	local categoryButtons, cells = {}, {}
+
+	-- Left: one button per category, with its sample icon.
+	for i, category in ipairs(ICON_CATEGORIES) do
+		local b = CreateFrame("Button", nil, f, backdrop)
+		b:SetSize(190, 44)
+		b:SetPoint("TOPLEFT", 18, -48 - (i - 1) * 54)
+		if b.SetBackdrop then
+			b:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+		end
+		local label = b:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+		label:SetPoint("LEFT", 12, 0)
+		label:SetPoint("RIGHT", -46, 0)
+		label:SetJustifyH("LEFT")
+		Loc(label, "ICONCAT_" .. category.key)
+		local sample = b:CreateTexture(nil, "ARTWORK")
+		sample:SetSize(34, 34)
+		sample:SetPoint("RIGHT", -6, 0)
+		sample:SetTexture(IconPath(category.sample))
+		b:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
+		b:GetHighlightTexture():SetAlpha(0.25)
+		b.categoryKey = category.key
+		b:SetScript("OnClick", function() shownCategory = category.key; f:Refresh() end)
+		categoryButtons[i] = b
+	end
+
+	-- Right: the shown category's icons in a grid; cells are reused between categories.
+	local function Cell(i)
+		if cells[i] then return cells[i] end
+		local c = CreateFrame("Button", nil, f)
+		c:SetSize(PICKER_CELL - 6, PICKER_CELL - 6)
+		local row, col = math.floor((i - 1) / PICKER_COLUMNS), (i - 1) % PICKER_COLUMNS
+		c:SetPoint("TOPLEFT", 222 + col * PICKER_CELL, -48 - row * PICKER_CELL)
+		local bg = c:CreateTexture(nil, "BACKGROUND")
 		bg:SetAllPoints()
-		bg:SetColorTexture(0, 0, 0, 0.35)
-		local tex = b:CreateTexture(nil, "ARTWORK")
-		tex:SetPoint("TOPLEFT", 4, -4)
-		tex:SetPoint("BOTTOMRIGHT", -4, 4)
-		tex:SetTexture(ICON_DIR .. key)
-		b.selected = b:CreateTexture(nil, "OVERLAY")
-		b.selected:SetTexture("Interface\\Buttons\\CheckButtonHilight")
-		b.selected:SetBlendMode("ADD")
-		b.selected:SetAllPoints()
-		b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-		b:SetScript("OnClick", function()
-			db.style = key
-			Sync()
+		bg:SetColorTexture(0, 0, 0, 0.4)
+		c.tex = c:CreateTexture(nil, "ARTWORK")
+		c.tex:SetPoint("TOPLEFT", 3, -3)
+		c.tex:SetPoint("BOTTOMRIGHT", -3, 3)
+		c.selected = c:CreateTexture(nil, "OVERLAY")
+		c.selected:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+		c.selected:SetBlendMode("ADD")
+		c.selected:SetAllPoints()
+		c:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+		c:SetScript("OnClick", function(self)
+			db.style = self.style
 			ApplySettings()
+			RefreshControls()
 		end)
-		b:SetScript("OnEnter", function(self)
+		c:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_TOP")
-			GameTooltip:SetText(L["STYLE_" .. key])
+			GameTooltip:SetText(StyleName(self.style))
 			GameTooltip:Show()
 		end)
-		b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-		buttons[i] = b
+		c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		cells[i] = c
+		return c
 	end
+
+	function f:Refresh()
+		local current = CategoryOf(db.style)
+		for _, b in ipairs(categoryButtons) do
+			local isShown = b.categoryKey == shownCategory
+			if b.SetBackdropColor then
+				if isShown then b:SetBackdropColor(0.25, 0.2, 0.05, 0.9) else b:SetBackdropColor(0.05, 0.05, 0.05, 0.9) end
+				-- Gold border on the shown category; a dimmer one on the category of the chosen icon.
+				if isShown then b:SetBackdropBorderColor(1, 0.82, 0)
+				elseif b.categoryKey == current then b:SetBackdropBorderColor(0.7, 0.6, 0.3)
+				else b:SetBackdropBorderColor(0.4, 0.4, 0.4) end
+			end
+		end
+		local icons = {}
+		for _, category in ipairs(ICON_CATEGORIES) do
+			if category.key == shownCategory then icons = category.icons end
+		end
+		for i, name in ipairs(icons) do
+			local c = Cell(i)
+			c.style = shownCategory .. "/" .. name
+			c.tex:SetTexture(IconPath(c.style))
+			c.selected:SetShown(c.style == db.style)
+			c:Show()
+		end
+		for i = #icons + 1, #cells do cells[i]:Hide() end
+	end
+	f:SetScript("OnShow", function() shownCategory = CategoryOf(db.style); f:Refresh() end)
+	panel:HookScript("OnHide", function() f:Hide() end)
+	return f
+end
+
+-- The button on the panel: current icon, its name and category; a click opens the picker.
+local function AddIconPicker(parent, x, y)
+	local backdrop = BackdropTemplateMixin and "BackdropTemplate" or nil
+	local b = CreateFrame("Button", nil, parent, backdrop)
+	b:SetSize(260, 48)
+	b:SetPoint("TOPLEFT", x, y)
+	if b.SetBackdrop then
+		b:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+		b:SetBackdropColor(0, 0, 0, 0.6)
+		b:SetBackdropBorderColor(0.6, 0.5, 0.25)
+	end
+	local icon = b:CreateTexture(nil, "ARTWORK")
+	icon:SetSize(38, 38)
+	icon:SetPoint("LEFT", 6, 0)
+	local name = b:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	name:SetPoint("TOPLEFT", icon, "TOPRIGHT", 10, -4)
+	name:SetPoint("RIGHT", -30, 0)
+	name:SetJustifyH("LEFT")
+	local category = b:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	category:SetPoint("BOTTOMLEFT", icon, "BOTTOMRIGHT", 10, 4)
+	category:SetPoint("RIGHT", -30, 0)
+	category:SetJustifyH("LEFT")
+	local arrow = b:CreateTexture(nil, "ARTWORK")
+	arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
+	arrow:SetSize(16, 16)
+	arrow:SetPoint("RIGHT", -10, 0)
+	b:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
+	b:GetHighlightTexture():SetAlpha(0.2)
+
+	local function Sync()
+		icon:SetTexture(IconPath(db.style))
+		name:SetText(StyleName(db.style))
+		category:SetText(L["ICONCAT_" .. CategoryOf(db.style)])
+		if iconPicker and iconPicker:IsShown() then iconPicker:Refresh() end
+	end
+	b:SetScript("OnClick", function(self)
+		iconPicker = iconPicker or BuildIconPicker()
+		if iconPicker:IsShown() then iconPicker:Hide() return end
+		iconPicker:ClearAllPoints()
+		iconPicker:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, -4)
+		iconPicker:Show()
+	end)
 	refreshers[#refreshers + 1] = Sync
 	parent:HookScript("OnShow", Sync)
-	return buttons
+	return b
 end
 
 -- Live preview, fixed on the right of the panel (it stays while the tabs change): a quest mob
@@ -1162,7 +1425,7 @@ local function CreateMinimapButton()
 	bg:SetSize(20, 20)
 	bg:SetPoint("TOPLEFT", 7, -5)
 	local icon = b:CreateTexture(nil, "ARTWORK")
-	icon:SetTexture(ICON_DIR .. "gold")
+	icon:SetTexture(IconPath(DEFAULT_STYLE))
 	icon:SetSize(17, 17)
 	icon:SetPoint("TOPLEFT", 7, -6)
 	b.icon = icon
@@ -1228,7 +1491,7 @@ local PREVIEW_WIDTH, PREVIEW_HEIGHT = 240, 340 -- the preview window
 local DISPLAY_KEYS = { "active", "enabled", "objects", "scale", "offsetX", "offset", "objectScale", "objectOffsetX", "objectOffset" }
 local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "glowAlpha" }
 local PROGRESS_KEYS = { "progress", "progressAttach", "progressFloat", "progressSize", "progressFont",
-	"progressOutline", "progressColor", "progressX", "progressY" }
+	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressX", "progressY" }
 local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice" }
 
 local function ResetKeys(keys)
@@ -1246,7 +1509,7 @@ local SECTION_HEADER = 34
 local function AddResetTabButton(tab, onReset)
 	local b = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
 	b:SetSize(130, 20)
-	b:SetPoint("TOPLEFT", tab, "TOPLEFT", LEFT + 200, TOP + SECTION_HEADER - 6)
+	b:SetPoint("TOPRIGHT", tab, "TOPRIGHT", -16, TOP + SECTION_HEADER - 6)
 	Loc(b, "RESET_SECTION")
 	b:SetScript("OnClick", function()
 		onReset()
@@ -1268,64 +1531,71 @@ local function GateCheck(condition, check)
 	return check
 end
 
+-- Two columns per section: related groups side by side (mobs | items, float | glow, ...).
+local COL1, COL2 = LEFT, LEFT + 290
+local COLUMN_DROPDOWN = 200
+
 local function BuildDisplayTab(tab)
 	AddResetTabButton(tab, function() ResetKeys(DISPLAY_KEYS) end)
-	AddCheck(tab, "ENABLE_ADDON", "ENABLE_ADDON_TIP", "active", LEFT, TOP)
+	AddCheck(tab, "ENABLE_ADDON", "ENABLE_ADDON_TIP", "active", COL1, TOP)
 
 	local y = TOP - 58
-	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_MOBS", "enabled", LEFT, y))
-	Gate(MobsOn, AddSlider(tab, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, LEFT + 4, y - 22, "%.2f"))
-	Gate(MobsOn, AddSlider(tab, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, y - 62, "%d"))
-	Gate(MobsOn, AddSlider(tab, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, y - 102, "%d"))
+	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_MOBS", "enabled", COL1, y))
+	Gate(MobsOn, AddSlider(tab, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, COL1 + 4, y - 22, "%.2f"))
+	Gate(MobsOn, AddSlider(tab, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 62, "%d"))
+	Gate(MobsOn, AddSlider(tab, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 102, "%d"))
 
-	y = y - 158
-	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_ITEMS", "objects", LEFT, y))
-	Gate(ItemsOn, AddSlider(tab, "ICON_SIZE", "objectScale", 0.5, 3.0, 0.05, LEFT + 4, y - 22, "%.2f"))
-	Gate(ItemsOn, AddSlider(tab, "POS_X", "objectOffsetX", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, y - 62, "%d"))
-	Gate(ItemsOn, AddSlider(tab, "POS_Y", "objectOffset", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, y - 102, "%d"))
+	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_ITEMS", "objects", COL2, y))
+	Gate(ItemsOn, AddSlider(tab, "ICON_SIZE", "objectScale", 0.5, 3.0, 0.05, COL2 + 4, y - 22, "%.2f"))
+	Gate(ItemsOn, AddSlider(tab, "POS_X", "objectOffsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 62, "%d"))
+	Gate(ItemsOn, AddSlider(tab, "POS_Y", "objectOffset", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 102, "%d"))
 end
 
 -- The objective count ("8/12") next to quest mobs: everything about it is its own.
 local function BuildProgressTab(tab)
 	AddResetTabButton(tab, function() ResetKeys(PROGRESS_KEYS) end)
-	GateCheck(MobsOn, AddCheck(tab, "PROGRESS", "PROGRESS_TIP", "progress", LEFT, TOP))
-	GateCheck(ProgressOn, AddCheck(tab, "PROGRESS_ATTACH", "PROGRESS_ATTACH_TIP", "progressAttach", LEFT, TOP - 48))
-	-- Floating with the icon needs the icon's own Float (Icon tab).
+	-- Left: what it does. Right: how it looks.
+	GateCheck(MobsOn, AddCheck(tab, "PROGRESS", "PROGRESS_TIP", "progress", COL1, TOP))
+	GateCheck(ProgressOn, AddCheck(tab, "PROGRESS_ATTACH", "PROGRESS_ATTACH_TIP", "progressAttach", COL1, TOP - 48))
+	-- Floating with the icon needs the icon's own Float.
 	GateCheck(function() return ProgressOn() and db.bounce end,
-		AddCheck(tab, "PROGRESS_FLOAT", "PROGRESS_FLOAT_TIP", "progressFloat", LEFT, TOP - 96))
-	Gate(ProgressOn, AddSlider(tab, "TEXT_SIZE", "progressSize", 8, 32, 1, LEFT + 4, TOP - 156, "%d"))
-	-- Attached, the text is glued to the icon: X/Y only apply when it stands on its own.
-	local function FreeTextOn() return ProgressOn() and not db.progressAttach end
-	Gate(FreeTextOn, AddSlider(tab, "POS_X", "progressX", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, TOP - 196, "%d"))
-	Gate(FreeTextOn, AddSlider(tab, "POS_Y", "progressY", -POSITION_RANGE, POSITION_RANGE, 1, LEFT + 4, TOP - 236, "%d"))
+		AddCheck(tab, "PROGRESS_FLOAT", "PROGRESS_FLOAT_TIP", "progressFloat", COL1, TOP - 96))
+	Gate(ProgressOn, AddSlider(tab, "TEXT_SIZE", "progressSize", 8, 32, 1, COL1 + 4, TOP - 150, "%d"))
 
-	-- Formatting: font and outline side by side, colour below.
 	local function Choice(key) return function() return db[key] end end
 	local function SetChoice(key) return function(value) db[key] = value; ApplySettings() end end
-	Gate(ProgressOn, AddDropdown(tab, "TEXT_FONT", TEXT_FONT_ORDER,
-		function(value) return L["FONT_" .. value] end, Choice("progressFont"), SetChoice("progressFont"),
-		LEFT + 4, TOP - 282, 165))
+	Gate(ProgressOn, AddDropdown(tab, "TEXT_FORMAT", PROGRESS_FORMATS,
+		function(value) return L["FORMAT_" .. value] end, Choice("progressFormat"), SetChoice("progressFormat"),
+		COL2 + 4, TOP, COLUMN_DROPDOWN))
+	-- The font menu also lists fonts shared by other addons, each drawn in its own font.
+	Gate(ProgressOn, AddDropdown(tab, "TEXT_FONT", FontOptions, FontLabel, Choice("progressFont"), SetChoice("progressFont"),
+		COL2 + 4, TOP - 54, COLUMN_DROPDOWN, FontPath))
 	Gate(ProgressOn, AddDropdown(tab, "TEXT_OUTLINE", { "none", "thin", "thick" },
 		function(value) return L["OUTLINE_" .. value] end, Choice("progressOutline"), SetChoice("progressOutline"),
-		LEFT + 180, TOP - 282, 165))
-	Gate(ProgressOn, AddDropdown(tab, "TEXT_COLOR", { "white", "gold", "green", "kind" },
+		COL2 + 4, TOP - 108, COLUMN_DROPDOWN))
+	Gate(ProgressOn, AddDropdown(tab, "TEXT_COLOR", { "white", "gold", "green", "kind", "progress" },
 		function(value) return L["COLOR_" .. value] end, Choice("progressColor"), SetChoice("progressColor"),
-		LEFT + 4, TOP - 336, 165))
+		COL2 + 4, TOP - 162, COLUMN_DROPDOWN))
+	GateCheck(ProgressOn, AddCheck(tab, "TEXT_SHADOW", "TEXT_SHADOW_TIP", "progressShadow", COL1, TOP - 196))
+
+	-- Attached, the text is glued to the icon: X/Y only apply when it stands on its own.
+	local function FreeTextOn() return ProgressOn() and not db.progressAttach end
+	Gate(FreeTextOn, AddSlider(tab, "POS_X", "progressX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, TOP - 252, "%d"))
+	Gate(FreeTextOn, AddSlider(tab, "POS_Y", "progressY", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, TOP - 252, "%d"))
 end
 
 local function BuildIconTab(tab)
 	AddResetTabButton(tab, function() ResetKeys(ICON_KEYS) end)
-	Gate(AnyIconOn, AddHeading(tab, "ICON_STYLE", LEFT, TOP))
-	Gate(AnyIconOn, unpack(AddStylePicker(tab, LEFT + 4, TOP - 18)))
+	Gate(AnyIconOn, AddHeading(tab, "ICON_STYLE", COL1, TOP))
+	Gate(AnyIconOn, AddIconPicker(tab, COL1 + 4, TOP - 18))
 
 	local y = TOP - 82
-	GateCheck(AnyIconOn, AddSectionCheck(tab, "FLOAT", "bounce", LEFT, y))
-	Gate(FloatOn, AddSlider(tab, "FLOAT_HEIGHT", "bounceHeight", 1, 20, 1, LEFT + 4, y - 22, "%d"))
-	Gate(FloatOn, AddSlider(tab, "FLOAT_TIME", "bounceSpeed", 0.3, 2.0, 0.05, LEFT + 4, y - 62, "%.2f"))
+	GateCheck(AnyIconOn, AddSectionCheck(tab, "FLOAT", "bounce", COL1, y))
+	Gate(FloatOn, AddSlider(tab, "FLOAT_HEIGHT", "bounceHeight", 1, 20, 1, COL1 + 4, y - 22, "%d"))
+	Gate(FloatOn, AddSlider(tab, "FLOAT_TIME", "bounceSpeed", 0.3, 2.0, 0.05, COL1 + 4, y - 62, "%.2f"))
 
-	y = y - 118
-	GateCheck(AnyIconOn, AddSectionCheck(tab, "GLOW_SECTION", "glow", LEFT, y))
-	Gate(GlowOn, AddSlider(tab, "GLOW_INTENSITY", "glowAlpha", 0.1, 1.0, 0.05, LEFT + 4, y - 22, "%.2f"))
+	GateCheck(AnyIconOn, AddSectionCheck(tab, "GLOW_SECTION", "glow", COL2, y))
+	Gate(GlowOn, AddSlider(tab, "GLOW_INTENSITY", "glowAlpha", 0.1, 1.0, 0.05, COL2 + 4, y - 22, "%.2f"))
 end
 
 local function BuildBehaviorTab(tab)
@@ -1335,15 +1605,15 @@ local function BuildBehaviorTab(tab)
 		L = BuildLocale("auto")
 		Relabel()
 	end)
-	GateCheck(AnyIconOn, AddCheck(tab, "COLOR_BY_TYPE", "COLOR_BY_TYPE_TIP", "colorByType", LEFT, TOP))
+	-- Left: how the icons behave. Right: language and sound.
+	GateCheck(AnyIconOn, AddCheck(tab, "COLOR_BY_TYPE", "COLOR_BY_TYPE_TIP", "colorByType", COL1, TOP))
 	-- The minimap button stays usable with the addon off: it is how you turn it back on.
-	AddCheck(tab, "MINIMAP", "MINIMAP_TIP", "minimap", LEFT, TOP - 48)
-
+	AddCheck(tab, "MINIMAP", "MINIMAP_TIP", "minimap", COL1, TOP - 48)
 	Gate(AnyIconOn, AddDropdown(tab, "IN_COMBAT", { "show", "fade", "hide" },
 		function(value) return L["COMBAT_" .. value:upper()] end,
 		function() return db.combat end,
 		function(value) db.combat = value; UpdateCombatAlpha() end,
-		LEFT + 4, TOP - 104))
+		COL1 + 4, TOP - 100, COLUMN_DROPDOWN))
 
 	local languages = { "auto" }
 	for _, code in ipairs(ns.LANGUAGES) do languages[#languages + 1] = code end
@@ -1351,19 +1621,19 @@ local function BuildBehaviorTab(tab)
 		function(code) return code == "auto" and L.LANGUAGE_AUTO or ns.LANGUAGE_NAMES[code] end,
 		function() return root.language end,
 		function(code) root.language = code; L = BuildLocale(code); Relabel() end,
-		LEFT + 4, TOP - 164)
+		COL2 + 4, TOP, COLUMN_DROPDOWN)
 
 	-- Sound when an objective completes: on/off, which sound, and a button to hear it.
 	local function SoundOn() return AddonOn() and db.sound end
-	GateCheck(AddonOn, AddCheck(tab, "SOUND", "SOUND_TIP", "sound", LEFT, TOP - 222))
+	GateCheck(AddonOn, AddCheck(tab, "SOUND", "SOUND_TIP", "sound", COL2, TOP - 56))
 	Gate(SoundOn, AddDropdown(tab, "SOUND_CHOICE", QUEST_SOUND_ORDER,
 		function(value) return L["SOUND_" .. value] end,
 		function() return db.soundChoice end,
 		function(value) db.soundChoice = value; PlayQuestSound() end,
-		LEFT + 4, TOP - 270, 165))
+		COL2 + 4, TOP - 104, 140))
 	local test = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
-	test:SetSize(80, 22)
-	test:SetPoint("TOPLEFT", LEFT + 180, TOP - 289)
+	test:SetSize(70, 22)
+	test:SetPoint("TOPLEFT", COL2 + 152, TOP - 123)
 	Loc(test, "SOUND_TEST")
 	test:SetScript("OnClick", PlayQuestSound)
 	Gate(SoundOn, test)
@@ -1371,7 +1641,7 @@ end
 
 -- Profiles tab in the Ace3 layout players know from RareScanner and many others: intro, reset,
 -- current profile, New + Existing profiles, Copy From, Delete a Profile (with a confirmation).
-local PROFILE_TEXT_WIDTH = OPTIONS_WIDTH - 36
+local PROFILE_TEXT_WIDTH = 560
 local DELETE_POPUP = "CSCODER_QUESTINDICATOR_DELETE_PROFILE"
 
 local function OtherProfiles()
@@ -1434,7 +1704,7 @@ local function BuildProfilesTab(tab)
 	Desc("PROF_CHOOSE_DESC", TOP - 106)
 	AddHeading(tab, "PROF_NEW", LEFT, TOP - 126)
 	local input = CreateFrame("EditBox", nil, tab, "InputBoxTemplate")
-	input:SetSize(168, 22)
+	input:SetSize(200, 22)
 	input:SetPoint("TOPLEFT", LEFT + 6, TOP - 144)
 	input:SetAutoFocus(false)
 	input:SetMaxLetters(32)
@@ -1447,7 +1717,7 @@ local function BuildProfilesTab(tab)
 		if not root.profiles[name] then root.profiles[name] = FillDefaults({}) end
 		UseProfile(name)
 	end)
-	AddDropdown(tab, "PROF_CHOOSE", ProfileNames, Name, ActiveProfileName, UseProfile, LEFT + 196, TOP - 126, 180)
+	AddDropdown(tab, "PROF_CHOOSE", ProfileNames, Name, ActiveProfileName, UseProfile, LEFT + 294, TOP - 126, 220)
 
 	Desc("PROF_COPY_DESC", TOP - 186)
 	AddDropdown(tab, "PROF_COPY", OtherProfiles, Name, Nothing, function(name)
@@ -1455,10 +1725,10 @@ local function BuildProfilesTab(tab)
 		if not source then return end
 		for key in pairs(DEFAULTS) do db[key] = source[key] end
 		AfterReset()
-	end, LEFT + 4, TOP - 206, 180)
+	end, LEFT + 4, TOP - 206, 220)
 
 	Desc("PROF_DELETE_DESC", TOP - 266)
-	AddDropdown(tab, "PROF_DELETE", OtherProfiles, Name, Nothing, ConfirmDelete, LEFT + 4, TOP - 286, 180)
+	AddDropdown(tab, "PROF_DELETE", OtherProfiles, Name, Nothing, ConfirmDelete, LEFT + 4, TOP - 286, 220)
 
 	local function Sync()
 		current:SetText(L.PROF_CURRENT .. " |cffffffff" .. tostring(ActiveProfileName()) .. "|r")
@@ -1471,13 +1741,13 @@ end
 -- places its controls from (LEFT, TOP) as on a full panel, so a section frame is shifted to put
 -- TOP right under its heading.
 local SETTINGS_SECTIONS = {
-	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 356 },
-	{ key = "TAB_ICON", build = BuildIconTab, height = 260 },
-	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 382 },
-	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 314 },
+	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 200 },
+	{ key = "TAB_ICON", build = BuildIconTab, height = 184 },
+	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 292 },
+	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 152 },
 }
-local SECTION_GAP = 16
-local CONTENT_WIDTH = OPTIONS_WIDTH - 34
+local SECTION_GAP = 18
+local CONTENT_WIDTH = 600 -- until the scroll frame reports its real width
 
 local function BuildSettingsTab(tab, box)
 	local scroll = CreateFrame("ScrollFrame", nil, tab, "UIPanelScrollFrameTemplate")
@@ -1486,20 +1756,24 @@ local function BuildSettingsTab(tab, box)
 	local content = CreateFrame("Frame", nil, scroll)
 	content:SetWidth(CONTENT_WIDTH)
 	scroll:SetScrollChild(content)
+	-- The page is as wide as the visible area, so headings and lines reach the right edge.
+	scroll:SetScript("OnSizeChanged", function(_, width) if width and width > 0 then content:SetWidth(width) end end)
 	settingsScroll = scroll
 
 	local y = 0
 	for _, s in ipairs(SETTINGS_SECTIONS) do
 		local section = CreateFrame("Frame", nil, content)
-		section:SetSize(CONTENT_WIDTH, 1)
+		section:SetHeight(1)
 		section:SetPoint("TOPLEFT", content, "TOPLEFT", -12, -(y + SECTION_HEADER) - TOP)
+		section:SetPoint("RIGHT", content, "RIGHT")
 		local heading = section:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 		heading:SetPoint("TOPLEFT", section, "TOPLEFT", LEFT, TOP + SECTION_HEADER - 8)
 		Loc(heading, s.key)
 		local line = section:CreateTexture(nil, "ARTWORK")
 		line:SetColorTexture(1, 0.82, 0, 0.25)
-		line:SetSize(CONTENT_WIDTH - 24, 1)
+		line:SetHeight(1)
 		line:SetPoint("TOPLEFT", section, "TOPLEFT", LEFT, TOP + 6)
+		line:SetPoint("TOPRIGHT", section, "TOPRIGHT", -16, TOP + 6)
 		s.build(section)
 		y = y + SECTION_HEADER + s.height + SECTION_GAP
 	end
@@ -1510,6 +1784,13 @@ local function BuildPanel()
 	local header = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	header:SetPoint("TOPLEFT", 16, -16)
 	header:SetText(TITLE)
+	-- Version next to the title (the packager fills it in; a dev copy shows "dev").
+	local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+	local version = getMeta and getMeta(ADDON, "Version")
+	if not version or version:find("^@") then version = "dev" end
+	local versionText = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	versionText:SetPoint("BOTTOMLEFT", header, "BOTTOMRIGHT", 8, 1)
+	versionText:SetText(version)
 	local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	sub:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -6)
 	sub:SetPoint("RIGHT", panel, "RIGHT", -140, 0)
@@ -1693,27 +1974,34 @@ end
 -- the preview is right even before a plate shows up in a new session.
 local plateMeasured = false
 
-local function MeasurePlate(unit)
-	if plateMeasured or not (root and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
+-- The game shrinks far plates and enlarges the target's (it scales the plate or its UnitFrame),
+-- and a plate is often first seen far away: those scales are taken out, so the saved size is
+-- the plate at its normal, close-range scale. force = measure again (for /cqi plate).
+local function MeasurePlate(unit, force)
+	if (plateMeasured and not force) or not (root and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
 	local plate = C_NamePlate.GetNamePlateForUnit(unit)
 	if not plate then return end
 	local w, h = plate:GetSize()
 	local eff = plate:GetEffectiveScale()
 	if not (w and h and eff) or w <= 0 or h <= 0 then return end
-	local geom = { w = w, h = h, eff = eff }
+	local plateScale = (plate.GetScale and plate:GetScale()) or 1
 	local frame = plate.UnitFrame
+	local frameScale = (frame and frame.GetScale and frame:GetScale()) or 1
+	local geom = { w = w, h = h, eff = eff / plateScale, plateScale = plateScale, frameScale = frameScale }
 	local bar = frame and (frame.healthBar or frame.HealthBar
 		or (frame.HealthBarsContainer and frame.HealthBarsContainer.healthBar))
 	local plateTop, barTop = plate:GetTop(), bar and bar.GetTop and bar:GetTop()
 	if bar and plateTop and barTop then
 		local bw, bh = bar:GetSize()
 		local barEff = bar:GetEffectiveScale()
-		geom.barW, geom.barH = bw * barEff / eff, bh * barEff / eff
-		geom.barTop = (plateTop * eff - barTop * barEff) / eff
+		local unitScale = eff * frameScale -- screen pixels per base plate unit, inside the UnitFrame
+		geom.barW, geom.barH = bw * barEff / unitScale, bh * barEff / unitScale
+		geom.barTop = (plateTop * eff - barTop * barEff) / unitScale
 	end
 	root.plateGeom = geom
 	plateMeasured = true
 	if UpdatePreview then UpdatePreview() end
+	return geom
 end
 
 local events = CreateFrame("Frame")
@@ -1804,6 +2092,16 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 		ApplySettings()
 		RefreshControls()
 		print("|cffffd200" .. TITLE .. "|r " .. (db.active and L.ON or L.OFF))
+	elseif cmd == "plate" then
+		-- Measures the target's nameplate for the preview and prints what was found.
+		local geom = UnitExists("target") and MeasurePlate("target", true)
+		if not geom then
+			print("|cffffd200" .. TITLE .. "|r target an enemy with a visible nameplate, then /cqi plate")
+			return
+		end
+		print(string.format("|cffffd200%s|r plate %.0fx%.0f, base scale %.2f (plate x%.2f, frame x%.2f), bar %s",
+			TITLE, geom.w, geom.h, geom.eff, geom.plateScale, geom.frameScale,
+			geom.barW and string.format("%.0fx%.0f at %.0f from the top", geom.barW, geom.barH, geom.barTop) or "not found"))
 	else
 		OpenPanel()
 	end

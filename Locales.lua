@@ -582,3 +582,178 @@ for k, v in pairs(soundText) do locales.enUS[k] = v end
 -- One scrolling settings page with sections (English only until the layout is approved).
 locales.enUS.TAB_SETTINGS = "Settings"
 locales.enUS.RESET_SECTION = "Reset section"
+
+-- v1.2 translations: progress text, one-page settings, Ace3 profiles, objective sound.
+local v12 = {
+	ptBR = {
+		TAB_SETTINGS = "Configurações", RESET_SECTION = "Redefinir seção", TAB_PROGRESS = "Progresso",
+		PROGRESS = "Mostrar progresso da missão", PROGRESS_TIP = "A contagem do objetivo (8/12) ao lado de cada mob de missão.",
+		PROGRESS_ATTACH = "Grudar no ícone", PROGRESS_ATTACH_TIP = "Ligado: colado à direita do ícone, acompanha ele. Desligado: livre, com X/Y próprios.",
+		PROGRESS_FLOAT = "Flutuar com o ícone", PROGRESS_FLOAT_TIP = "Sobe e desce junto com o ícone (precisa da Flutuação ligada).",
+		TEXT_SIZE = "Tamanho do texto", TEXT_FONT = "Fonte", TEXT_OUTLINE = "Contorno",
+		OUTLINE_none = "Nenhum", OUTLINE_thin = "Fino", OUTLINE_thick = "Grosso",
+		TEXT_COLOR = "Cor", COLOR_white = "Branco", COLOR_gold = "Dourado", COLOR_green = "Verde", COLOR_kind = "Igual ao ícone",
+		PROF_INTRO = "Perfis permitem que cada personagem tenha suas próprias configurações.",
+		PROF_RESET_DESC = "Volta o perfil atual para as configurações padrão.", PROF_RESET = "Redefinir perfil",
+		PROF_CURRENT = "Perfil atual:", PROF_CHOOSE_DESC = "Crie um perfil novo digitando um nome, ou escolha um existente.",
+		PROF_NEW = "Novo", PROF_CHOOSE = "Perfis existentes",
+		PROF_COPY_DESC = "Copia as configurações de outro perfil para o atual.", PROF_COPY = "Copiar de",
+		PROF_DELETE_DESC = "Apague os perfis que você não usa mais.", PROF_DELETE = "Apagar um perfil",
+		PROF_DELETE_CONFIRM = "Apagar o perfil \"%s\"?",
+		SOUND = "Som ao completar um objetivo", SOUND_TIP = "Toca quando um objetivo de missão é concluído (12/12).",
+		SOUND_CHOICE = "Som", SOUND_TEST = "Testar", SOUND_quest = "Missão concluída", SOUND_ping = "Ping no mapa",
+		SOUND_ready = "Verificação de prontidão", SOUND_warning = "Aviso de raide", SOUND_levelup = "Subir de nível",
+	},
+	esES = {
+		TAB_SETTINGS = "Configuración", RESET_SECTION = "Restablecer sección", TAB_PROGRESS = "Progreso",
+		PROGRESS = "Mostrar progreso de la misión", PROGRESS_TIP = "El contador del objetivo (8/12) junto a cada enemigo de misión.",
+		PROGRESS_ATTACH = "Pegar al icono", PROGRESS_ATTACH_TIP = "Activado: pegado a la derecha del icono, lo sigue. Desactivado: libre, con su propio X/Y.",
+		PROGRESS_FLOAT = "Flotar con el icono", PROGRESS_FLOAT_TIP = "Sube y baja junto con el icono (requiere que el icono flote).",
+		TEXT_SIZE = "Tamaño del texto", TEXT_FONT = "Fuente", TEXT_OUTLINE = "Contorno",
+		OUTLINE_none = "Ninguno", OUTLINE_thin = "Fino", OUTLINE_thick = "Grueso",
+		TEXT_COLOR = "Color", COLOR_white = "Blanco", COLOR_gold = "Dorado", COLOR_green = "Verde", COLOR_kind = "Igual que el icono",
+		PROF_INTRO = "Los perfiles permiten que cada personaje tenga su propia configuración.",
+		PROF_RESET_DESC = "Devuelve el perfil actual a la configuración predeterminada.", PROF_RESET = "Restablecer perfil",
+		PROF_CURRENT = "Perfil actual:", PROF_CHOOSE_DESC = "Crea un perfil nuevo escribiendo un nombre o elige uno existente.",
+		PROF_NEW = "Nuevo", PROF_CHOOSE = "Perfiles existentes",
+		PROF_COPY_DESC = "Copia la configuración de otro perfil al actual.", PROF_COPY = "Copiar de",
+		PROF_DELETE_DESC = "Borra los perfiles que ya no uses.", PROF_DELETE = "Borrar un perfil",
+		PROF_DELETE_CONFIRM = "¿Borrar el perfil \"%s\"?",
+		SOUND = "Sonido al completar un objetivo", SOUND_TIP = "Suena cuando se completa un objetivo de misión (12/12).",
+		SOUND_CHOICE = "Sonido", SOUND_TEST = "Probar", SOUND_quest = "Misión completada", SOUND_ping = "Marca en el mapa",
+		SOUND_ready = "Comprobación de listos", SOUND_warning = "Aviso de banda", SOUND_levelup = "Subida de nivel",
+	},
+	deDE = {
+		TAB_SETTINGS = "Einstellungen", RESET_SECTION = "Abschnitt zurücksetzen", TAB_PROGRESS = "Fortschritt",
+		PROGRESS = "Questfortschritt anzeigen", PROGRESS_TIP = "Der Zielzähler (8/12) neben jedem Questgegner.",
+		PROGRESS_ATTACH = "Am Symbol anheften", PROGRESS_ATTACH_TIP = "An: rechts am Symbol, folgt ihm. Aus: frei, mit eigenem X/Y.",
+		PROGRESS_FLOAT = "Mit dem Symbol schweben", PROGRESS_FLOAT_TIP = "Schwebt mit dem Symbol auf und ab (das Symbol muss schweben).",
+		TEXT_SIZE = "Textgröße", TEXT_FONT = "Schriftart", TEXT_OUTLINE = "Umriss",
+		OUTLINE_none = "Keiner", OUTLINE_thin = "Dünn", OUTLINE_thick = "Dick",
+		TEXT_COLOR = "Farbe", COLOR_white = "Weiß", COLOR_gold = "Gold", COLOR_green = "Grün", COLOR_kind = "Wie das Symbol",
+		PROF_INTRO = "Mit Profilen kann jeder Charakter eigene Einstellungen haben.",
+		PROF_RESET_DESC = "Setzt das aktuelle Profil auf die Standardwerte zurück.", PROF_RESET = "Profil zurücksetzen",
+		PROF_CURRENT = "Aktuelles Profil:", PROF_CHOOSE_DESC = "Erstelle ein neues Profil mit einem Namen oder wähle ein vorhandenes.",
+		PROF_NEW = "Neu", PROF_CHOOSE = "Vorhandene Profile",
+		PROF_COPY_DESC = "Kopiert die Einstellungen eines anderen Profils in das aktuelle.", PROF_COPY = "Kopieren von",
+		PROF_DELETE_DESC = "Lösche Profile, die du nicht mehr benutzt.", PROF_DELETE = "Profil löschen",
+		PROF_DELETE_CONFIRM = "Profil \"%s\" löschen?",
+		SOUND = "Ton bei erfülltem Questziel", SOUND_TIP = "Ertönt, wenn ein Questziel erfüllt ist (12/12).",
+		SOUND_CHOICE = "Ton", SOUND_TEST = "Testen", SOUND_quest = "Quest abgeschlossen", SOUND_ping = "Kartenmarkierung",
+		SOUND_ready = "Bereitschaftscheck", SOUND_warning = "Schlachtzugswarnung", SOUND_levelup = "Stufenaufstieg",
+	},
+	frFR = {
+		TAB_SETTINGS = "Paramètres", RESET_SECTION = "Réinitialiser la section", TAB_PROGRESS = "Progression",
+		PROGRESS = "Afficher la progression de quête", PROGRESS_TIP = "Le compteur d'objectif (8/12) à côté de chaque monstre de quête.",
+		PROGRESS_ATTACH = "Attacher à l'icône", PROGRESS_ATTACH_TIP = "Activé : collé à droite de l'icône, il la suit. Désactivé : libre, avec ses propres X/Y.",
+		PROGRESS_FLOAT = "Flotter avec l'icône", PROGRESS_FLOAT_TIP = "Monte et descend avec l'icône (l'icône doit flotter).",
+		TEXT_SIZE = "Taille du texte", TEXT_FONT = "Police", TEXT_OUTLINE = "Contour",
+		OUTLINE_none = "Aucun", OUTLINE_thin = "Fin", OUTLINE_thick = "Épais",
+		TEXT_COLOR = "Couleur", COLOR_white = "Blanc", COLOR_gold = "Doré", COLOR_green = "Vert", COLOR_kind = "Comme l'icône",
+		PROF_INTRO = "Les profils permettent à chaque personnage d'avoir ses propres réglages.",
+		PROF_RESET_DESC = "Remet le profil actuel sur les réglages par défaut.", PROF_RESET = "Réinitialiser le profil",
+		PROF_CURRENT = "Profil actuel :", PROF_CHOOSE_DESC = "Créez un profil en tapant un nom, ou choisissez-en un existant.",
+		PROF_NEW = "Nouveau", PROF_CHOOSE = "Profils existants",
+		PROF_COPY_DESC = "Copie les réglages d'un autre profil dans le profil actuel.", PROF_COPY = "Copier depuis",
+		PROF_DELETE_DESC = "Supprimez les profils que vous n'utilisez plus.", PROF_DELETE = "Supprimer un profil",
+		PROF_DELETE_CONFIRM = "Supprimer le profil « %s » ?",
+		SOUND = "Son quand un objectif est terminé", SOUND_TIP = "Joue quand un objectif de quête est accompli (12/12).",
+		SOUND_CHOICE = "Son", SOUND_TEST = "Tester", SOUND_quest = "Quête terminée", SOUND_ping = "Signal sur la carte",
+		SOUND_ready = "Appel de préparation", SOUND_warning = "Avertissement de raid", SOUND_levelup = "Niveau supérieur",
+	},
+	itIT = {
+		TAB_SETTINGS = "Impostazioni", RESET_SECTION = "Ripristina sezione", TAB_PROGRESS = "Progresso",
+		PROGRESS = "Mostra progresso missione", PROGRESS_TIP = "Il contatore dell'obiettivo (8/12) accanto a ogni mostro di missione.",
+		PROGRESS_ATTACH = "Attacca all'icona", PROGRESS_ATTACH_TIP = "Attivo: incollato a destra dell'icona, la segue. Disattivo: libero, con X/Y propri.",
+		PROGRESS_FLOAT = "Fluttua con l'icona", PROGRESS_FLOAT_TIP = "Sale e scende insieme all'icona (l'icona deve fluttuare).",
+		TEXT_SIZE = "Dimensione del testo", TEXT_FONT = "Carattere", TEXT_OUTLINE = "Contorno",
+		OUTLINE_none = "Nessuno", OUTLINE_thin = "Sottile", OUTLINE_thick = "Spesso",
+		TEXT_COLOR = "Colore", COLOR_white = "Bianco", COLOR_gold = "Oro", COLOR_green = "Verde", COLOR_kind = "Come l'icona",
+		PROF_INTRO = "I profili permettono a ogni personaggio di avere le proprie impostazioni.",
+		PROF_RESET_DESC = "Riporta il profilo attuale alle impostazioni predefinite.", PROF_RESET = "Ripristina profilo",
+		PROF_CURRENT = "Profilo attuale:", PROF_CHOOSE_DESC = "Crea un nuovo profilo scrivendo un nome, oppure scegline uno esistente.",
+		PROF_NEW = "Nuovo", PROF_CHOOSE = "Profili esistenti",
+		PROF_COPY_DESC = "Copia le impostazioni di un altro profilo in quello attuale.", PROF_COPY = "Copia da",
+		PROF_DELETE_DESC = "Elimina i profili che non usi più.", PROF_DELETE = "Elimina un profilo",
+		PROF_DELETE_CONFIRM = "Eliminare il profilo \"%s\"?",
+		SOUND = "Suono al completamento di un obiettivo", SOUND_TIP = "Suona quando un obiettivo di missione è completato (12/12).",
+		SOUND_CHOICE = "Suono", SOUND_TEST = "Prova", SOUND_quest = "Missione completata", SOUND_ping = "Segnale sulla mappa",
+		SOUND_ready = "Appello di prontezza", SOUND_warning = "Avviso d'incursione", SOUND_levelup = "Salita di livello",
+	},
+}
+for code, keys in pairs(v12) do
+	for k, v in pairs(keys) do locales[code][k] = v end
+end
+
+-- Icon picker: category names and the name of every icon (tooltip), in the picker's order.
+local ICON_KEYS = {
+	"classic_gold", "classic_blue", "classic_red", "classic_badge", "classic_pixel",
+	"yellow", "blue", "red", "green", "purple", "orange", "circle_yellow", "circle_blue", "circle_red",
+	"circle_green", "circle_purple", "shield_yellow", "shield_blue", "shield_red",
+	"laurels", "horde", "alliance", "banner", "scroll", "sign", "gear", "crystal", "leaves", "arcane", "stone",
+	"highlight", "ring", "signal", "orbit", "white", "alert", "fire", "bright", "inactive", "blocked", "hourglass", "refresh",
+}
+local iconNames = {
+	enUS = { cats = { "Standard (Quests)", "Themed", "States / Priority" }, names = {
+		"Classic gold", "Classic blue", "Classic red", "Classic badge", "Classic pixel",
+		"Yellow", "Blue", "Red", "Green", "Purple", "Orange", "Yellow circle", "Blue circle", "Red circle",
+		"Green circle", "Purple circle", "Yellow shield", "Blue shield", "Red shield",
+		"Laurels", "Horde", "Alliance", "Banner", "Scroll", "Wooden sign", "Gear", "Crystal", "Leaves", "Arcane", "Runestone",
+		"Highlight", "Ring", "Signal", "Orbit", "White", "Alert", "Fire", "Bright", "Inactive", "Blocked", "Hourglass", "Refresh" } },
+	ptBR = { cats = { "Padrão (Quests)", "Temáticos", "Estados / Prioridade" }, names = {
+		"Dourado clássico", "Azul clássico", "Vermelho clássico", "Medalha clássica", "Pixel clássico",
+		"Amarelo", "Azul", "Vermelho", "Verde", "Roxo", "Laranja", "Círculo amarelo", "Círculo azul", "Círculo vermelho",
+		"Círculo verde", "Círculo roxo", "Escudo amarelo", "Escudo azul", "Escudo vermelho",
+		"Louros", "Horda", "Aliança", "Estandarte", "Pergaminho", "Placa de madeira", "Engrenagem", "Cristal", "Folhas", "Arcano", "Pedra rúnica",
+		"Destaque", "Anel", "Sinal", "Órbita", "Branco", "Alerta", "Fogo", "Brilhante", "Inativo", "Bloqueado", "Ampulheta", "Atualizar" } },
+	esES = { cats = { "Estándar (misiones)", "Temáticos", "Estados / Prioridad" }, names = {
+		"Dorado clásico", "Azul clásico", "Rojo clásico", "Insignia clásica", "Píxel clásico",
+		"Amarillo", "Azul", "Rojo", "Verde", "Morado", "Naranja", "Círculo amarillo", "Círculo azul", "Círculo rojo",
+		"Círculo verde", "Círculo morado", "Escudo amarillo", "Escudo azul", "Escudo rojo",
+		"Laureles", "Horda", "Alianza", "Estandarte", "Pergamino", "Cartel de madera", "Engranaje", "Cristal", "Hojas", "Arcano", "Piedra rúnica",
+		"Destacado", "Anillo", "Señal", "Órbita", "Blanco", "Alerta", "Fuego", "Brillante", "Inactivo", "Bloqueado", "Reloj de arena", "Actualizar" } },
+	deDE = { cats = { "Standard (Quests)", "Thematisch", "Status / Priorität" }, names = {
+		"Klassisch Gold", "Klassisch Blau", "Klassisch Rot", "Klassisches Abzeichen", "Klassisch Pixel",
+		"Gelb", "Blau", "Rot", "Grün", "Lila", "Orange", "Gelber Kreis", "Blauer Kreis", "Roter Kreis",
+		"Grüner Kreis", "Lila Kreis", "Gelbes Wappen", "Blaues Wappen", "Rotes Wappen",
+		"Lorbeeren", "Horde", "Allianz", "Banner", "Schriftrolle", "Holzschild", "Zahnrad", "Kristall", "Blätter", "Arkan", "Runenstein",
+		"Hervorgehoben", "Ring", "Signal", "Umlaufbahn", "Weiß", "Alarm", "Feuer", "Hell", "Inaktiv", "Gesperrt", "Sanduhr", "Aktualisieren" } },
+	frFR = { cats = { "Standard (quêtes)", "Thématiques", "États / Priorité" }, names = {
+		"Or classique", "Bleu classique", "Rouge classique", "Insigne classique", "Pixel classique",
+		"Jaune", "Bleu", "Rouge", "Vert", "Violet", "Orange", "Cercle jaune", "Cercle bleu", "Cercle rouge",
+		"Cercle vert", "Cercle violet", "Écu jaune", "Écu bleu", "Écu rouge",
+		"Lauriers", "Horde", "Alliance", "Étendard", "Parchemin", "Panneau en bois", "Engrenage", "Cristal", "Feuilles", "Arcane", "Pierre runique",
+		"Surbrillance", "Anneau", "Signal", "Orbite", "Blanc", "Alerte", "Feu", "Lumineux", "Inactif", "Bloqué", "Sablier", "Actualiser" } },
+	itIT = { cats = { "Standard (missioni)", "Tematici", "Stati / Priorità" }, names = {
+		"Oro classico", "Blu classico", "Rosso classico", "Distintivo classico", "Pixel classico",
+		"Giallo", "Blu", "Rosso", "Verde", "Viola", "Arancione", "Cerchio giallo", "Cerchio blu", "Cerchio rosso",
+		"Cerchio verde", "Cerchio viola", "Scudo giallo", "Scudo blu", "Scudo rosso",
+		"Allori", "Orda", "Alleanza", "Stendardo", "Pergamena", "Cartello di legno", "Ingranaggio", "Cristallo", "Foglie", "Arcano", "Pietra runica",
+		"Evidenziato", "Anello", "Segnale", "Orbita", "Bianco", "Allerta", "Fuoco", "Luminoso", "Inattivo", "Bloccato", "Clessidra", "Aggiorna" } },
+}
+local CATEGORY_KEYS = { "standard", "themed", "states" }
+for code, data in pairs(iconNames) do
+	for i, key in ipairs(CATEGORY_KEYS) do locales[code]["ICONCAT_" .. key] = data.cats[i] end
+	for i, key in ipairs(ICON_KEYS) do locales[code]["ICON_" .. key] = data.names[i] end
+end
+
+-- Progress text format, colour by progress and shadow.
+local textFormat = {
+	enUS = { TEXT_FORMAT = "Format", FORMAT_left = "4 left", FORMAT_LEFT_N = "%d left",
+		COLOR_progress = "By progress (red to green)", TEXT_SHADOW = "Shadow", TEXT_SHADOW_TIP = "A soft drop shadow behind the text." },
+	ptBR = { TEXT_FORMAT = "Formato", FORMAT_left = "faltam 4", FORMAT_LEFT_N = "faltam %d",
+		COLOR_progress = "Pelo progresso (vermelho a verde)", TEXT_SHADOW = "Sombra", TEXT_SHADOW_TIP = "Uma sombra suave atrás do texto." },
+	esES = { TEXT_FORMAT = "Formato", FORMAT_left = "faltan 4", FORMAT_LEFT_N = "faltan %d",
+		COLOR_progress = "Según el progreso (rojo a verde)", TEXT_SHADOW = "Sombra", TEXT_SHADOW_TIP = "Una sombra suave detrás del texto." },
+	deDE = { TEXT_FORMAT = "Format", FORMAT_left = "noch 4", FORMAT_LEFT_N = "noch %d",
+		COLOR_progress = "Nach Fortschritt (rot bis grün)", TEXT_SHADOW = "Schatten", TEXT_SHADOW_TIP = "Ein weicher Schatten hinter dem Text." },
+	frFR = { TEXT_FORMAT = "Format", FORMAT_left = "encore 4", FORMAT_LEFT_N = "encore %d",
+		COLOR_progress = "Selon la progression (rouge à vert)", TEXT_SHADOW = "Ombre", TEXT_SHADOW_TIP = "Une ombre douce derrière le texte." },
+	itIT = { TEXT_FORMAT = "Formato", FORMAT_left = "mancano 4", FORMAT_LEFT_N = "mancano %d",
+		COLOR_progress = "In base al progresso (rosso a verde)", TEXT_SHADOW = "Ombra", TEXT_SHADOW_TIP = "Un'ombra morbida dietro il testo." },
+}
+for code, keys in pairs(textFormat) do
+	-- The format examples are the same in every language, except "4 left".
+	keys.FORMAT_slash, keys.FORMAT_spaced, keys.FORMAT_both, keys.FORMAT_percent = "8/12", "8 / 12", "8/12 (67%)", "67%"
+	for k, v in pairs(keys) do locales[code][k] = v end
+end

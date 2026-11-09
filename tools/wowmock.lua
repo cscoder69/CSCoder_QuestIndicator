@@ -76,6 +76,12 @@ env.SlashCmdList = {}
 for _, k in ipairs({ "pairs", "ipairs", "type", "tostring", "tonumber", "table", "string", "math", "setmetatable", "pcall", "next", "select", "unpack" }) do rawset(env, k, _G[k]) end
 
 if arg[2] == "old" then env.CSCoderQuestIndicatorDB = { version = 4, scale = 2.0, offset = -12, style = "red", glow = true, savedCVars = { SoftTargetIconGameObject = "0" } } end
+-- A fake LibSharedMedia with 30 fonts (another addon's), to exercise the multi-column font menu.
+local fakeFonts = {}
+for i = 1, 30 do fakeFonts[i] = "Shared Font " .. i end
+local fakeLSM = { List = function() return fakeFonts end, Fetch = function(_, _, name) return "Interface\\AddOns\\X\\" .. name .. ".ttf" end }
+rawset(_G, "LibStub", function(name) return name == "LibSharedMedia-3.0" and fakeLSM or nil end)
+
 local ns = {}
 for _, file in ipairs({ "Locales.lua", "CSCoder_QuestIndicator.lua" }) do
 	local chunk = assert(loadfile(dir .. "/" .. file))
@@ -119,11 +125,23 @@ clickAll(later, 1)
 try("slash", env.SlashCmdList.CSCODERQUESTINDICATOR, "toggle")
 try("slash open", env.SlashCmdList.CSCODERQUESTINDICATOR, "")
 
+-- /cqi plate on a fake target plate drawn at 0.8 distance scale: the saved size must be the
+-- close-range one (base scale 1, bar 100x10 at 10 from the top).
+env.UnitExists = function() return true end
+local fakeBar = { GetTop = function() return 90 end, GetSize = function() return 100, 10 end, GetEffectiveScale = function() return 0.8 end }
+local fakePlate = { GetSize = function() return 120, 40 end, GetEffectiveScale = function() return 0.8 end, GetScale = function() return 0.8 end,
+	GetTop = function() return 100 end, UnitFrame = { GetScale = function() return 1 end, healthBar = fakeBar } }
+env.C_NamePlate.GetNamePlateForUnit = function() return fakePlate end
+try("slash plate", env.SlashCmdList.CSCODERQUESTINDICATOR, "plate")
+local g = env.CSCoderQuestIndicatorDB.plateGeom or {}
+print("plate:", g.w, g.h, "base scale", g.eff, "bar", g.barW, g.barH, "top", g.barTop)
+env.UnitExists = function() return false end
+
 local db = env.CSCoderQuestIndicatorDB
 local names = {}
 for name in pairs(db.profiles) do names[#names + 1] = name end
 print("profiles:", table.concat(names, ", "), "| char ->", db.chars["Tester - Realm"], "| language:", db.language)
-local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1 }
+local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1 }
 local unexpected = {}
 for k in pairs(missing) do if not known[k] then unexpected[#unexpected + 1] = k end end
 print("unexpected nil globals:", #unexpected == 0 and "none" or table.concat(unexpected, ", "))

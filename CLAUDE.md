@@ -22,9 +22,9 @@ a Classic base with modern APIs (C_NamePlate, C_TooltipInfo, C_QuestLog, Setting
 | `CSCoder_QuestIndicator.toc` | `## Version: @project-version@` (the packager fills it from the tag), `X-Curse-Project-ID: 1793185` |
 | `Locales.lua` | Panel text. `ns.LANGUAGES` = enUS, ptBR, esES (esMX uses it), deDE, frFR, itIT. Blocks are appended over time (minimap, resets, toggles, switches, v2); later blocks override earlier keys. Unknown game languages fall back to English. |
 | `CSCoder_QuestIndicator.lua` | Everything else (sections below). |
-| `icons/*.tga` | 5 styles, 128 px, 32-bit uncompressed TGA, top-left origin. Made by `tools/make_icons.ps1`. |
+| `icons/<category>/<name>.tga` | 37 icons (since 2026-11-09, made by the user with ChatGPT), 256 px, 32-bit uncompressed TGA: `standard` (14), `themed` (11), `states` (12). Catalogue `ICON_CATEGORIES`; style key "category/name"; old keys (gold/blue/red/badge/pixel) migrate via `OLD_STYLES`. Picked in a window (`AddIconPicker`/`BuildIconPicker`). `tools/make_icons.ps1` made the old 5 and is obsolete. |
 | `media/` | README images only (logo, icon sheet). Ignored by the packager. |
-| `tools/` | Dev tools (not packaged): `wowmock.lua`, `make_icons.ps1`, `make_logo.ps1`, `switch_mode.ps1` + `mode-dev.bat` / `mode-release.bat` (installed addon = junction to source, or a copy of the latest GitHub release). The CurseForge app must NOT manage this addon on the dev PC: on 2026-11-09 it replaced the junction with the v1.1.0 copy. |
+| `tools/` | Dev tools (not packaged): `wowmock.lua`, `halve_tga.lua` (256 -> 128 px icons), `make_icons.ps1`, `make_logo.ps1`, `switch_mode.ps1` + `mode-dev.bat` / `mode-release.bat` (installed addon = junction to source, or a copy of the latest GitHub release). The CurseForge app must NOT manage this addon on the dev PC: on 2026-11-09 it replaced the junction with the v1.1.0 copy. |
 | `.pkgmeta` | Packager: ignores media, README, .github, tools, CLAUDE.md. |
 | `.github/workflows/release.yml` | Tag `v*` → BigWigs packager `-g forever` → CurseForge + GitHub Releases. |
 
@@ -60,6 +60,15 @@ live in game after `/reload`.
     Behavior also has the objective-complete sound (on/off, sound choice, Test).
     The preview copies a real enemy nameplate measured in the world (`MeasurePlate` ->
     `root.plateGeom`, `ApplyPlateGeometry`, icon `previewRatio`) so preview == world.
+  - Sections use two columns (`COL1`, `COL2` = LEFT + 290; sliders `SLIDER_WIDTH` 200, column dropdowns 200):
+    Display mobs | items, Icon float | glow, Progress options | font/outline/color (X | Y below),
+    Behavior icons | language + sound. Section reset buttons sit at the right of each heading.
+    Version shown next to the panel title ("dev" in the source copy).
+  - Progress text formatting (2026-11-09): format menu (`PROGRESS_FORMATS`, `FormatProgress`), fonts
+    from LibSharedMedia when another addon loaded it (`SharedMedia`, `FontOptions`, saved as
+    "lsm:<name>", looked up lazily, no embedded lib), colour "progress" (`ProgressColor`, off by
+    default), shadow check (off by default). Dropdowns wrap long lists into columns
+    (`DROPDOWN_MAX_ROWS`) and can draw entries in their own font (`fontFor`).
   - (Older layout notes below.)
   - Left: a box of **four Ace3-style tabs** (game textures `UI-OptionsFrame-ActiveTab/InActiveTab`,
     tabs stretched to fill, like BlizzMove): **Display** (Enable addon; Quest mobs ☑ + size, horizontal
