@@ -18,7 +18,7 @@ A floating, animated **"!"** over the mobs and objects you still need for your q
 ## How to use
 
 1. Turn on enemy nameplates (default key **V**).
-2. Open the options at **Options > AddOns > CS.Coder - Quest Indicator**, or type **/cqi**.
+2. Open the options at **Options > AddOns > CS.Coder > Quest Indicator**, or type **/cqi**.
 
 | Command | What it does |
 |---|---|

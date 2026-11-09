@@ -1,9 +1,10 @@
 ## Interface: 16001, 11509, 120105
 ## Title: CS.Coder - Quest Indicator
-## Notes: Floating, animated quest icon over mobs and objects you still need for an active quest.
+## Notes: Floating, animated quest icon over the mobs and items you still need. Styles, preview, profiles, minimap button.
 ## Author: CS.Coder
 ## Version: @project-version@
 ## X-Curse-Project-ID: 1793185
 ## SavedVariables: CSCoderQuestIndicatorDB
 
+Locales.lua
 CSCoder_QuestIndicator.lua
