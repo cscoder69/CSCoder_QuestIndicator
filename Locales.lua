@@ -802,3 +802,14 @@ local anchorText = {
 for code, keys in pairs(anchorText) do
 	for k, v in pairs(keys) do locales[code][k] = v end
 end
+
+-- Login message: %1 = addon title, %2 = version, %3 = the slash command.
+local welcome = {
+	enUS = "%s %s loaded. Type %s for options.",
+	ptBR = "%s %s carregado. Digite %s para abrir as opções.",
+	esES = "%s %s cargado. Escribe %s para las opciones.",
+	deDE = "%s %s geladen. Gib %s ein, um die Optionen zu öffnen.",
+	frFR = "%s %s chargé. Tapez %s pour les options.",
+	itIT = "%s %s caricato. Digita %s per le opzioni.",
+}
+for code, text in pairs(welcome) do locales[code].WELCOME = text end

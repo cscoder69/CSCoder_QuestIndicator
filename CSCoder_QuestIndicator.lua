@@ -55,6 +55,14 @@ local DEFAULTS = {
 -- Saved layout: CSCoderQuestIndicatorDB = { version, language, profiles = { name = settings },
 -- chars = { "Name - Realm" = profile name }, savedCVars }.
 local SETTINGS_VERSION = 5
+
+-- The addon's version from the .toc (the packager fills it in; a dev copy shows "dev").
+local function AddonVersion()
+	local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+	local version = getMeta and getMeta(ADDON, "Version")
+	if type(version) ~= "string" or version:find("^@") then version = "dev" end
+	return version
+end
 local DEFAULT_PROFILE = "Default"
 
 local ICON_DIR = "Interface\\AddOns\\CSCoder_QuestIndicator\\icons\\"
@@ -1985,9 +1993,7 @@ local function BuildPanel()
 	header:SetPoint("TOPLEFT", 16, -16)
 	header:SetText(TITLE)
 	-- Version next to the title (the packager fills it in; a dev copy shows "dev").
-	local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-	local version = getMeta and getMeta(ADDON, "Version")
-	if not version or version:find("^@") then version = "dev" end
+	local version = AddonVersion()
 	local versionText = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	versionText:SetPoint("BOTTOMLEFT", header, "BOTTOMRIGHT", 8, 1)
 	versionText:SetText(version)
@@ -2290,6 +2296,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		RefreshSoftObject()
 	elseif event == "PLAYER_LOGIN" then
 		ResolveCharacter() -- the character name is certain by now
+		print(string.format(L.WELCOME, "|cffffd200" .. TITLE .. "|r", AddonVersion(), "|cff00ff00/cqi|r"))
 		RebuildQuestTitles(); RebuildObjectiveTexts()
 		RefreshControls()
 		ApplySettings()
