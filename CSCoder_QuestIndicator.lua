@@ -1681,7 +1681,7 @@ end
 
 local LEFT, TOP = 16, -96
 local OPTIONS_WIDTH = 404 -- the tabbed box on the left
-local PREVIEW_WIDTH, PREVIEW_HEIGHT = 240, 340 -- the preview window
+local PREVIEW_WIDTH, PREVIEW_HEIGHT = 400, 400 -- the preview window: room for a real-size plate with icons on any side
 
 -- Settings each tab owns, for its "Reset this tab" button.
 local DISPLAY_KEYS = { "active", "enabled", "objects", "anchor", "scale", "offsetX", "offset",
@@ -2198,7 +2198,7 @@ end
 
 local ShowWizard
 do -- (a block of its own: the main chunk is near Lua's 200-locals limit)
-local WIZARD_WIDTH, WIZARD_HEIGHT = 700, 470
+local WIZARD_WIDTH, WIZARD_HEIGHT = 860, 480
 local wizard
 
 local function MarkSetupSeen()
@@ -2250,7 +2250,7 @@ local function BuildWizard()
 
 	-- Live preview on the right of the configure pages.
 	local previewPane = CreateFrame("Frame", nil, f)
-	previewPane:SetSize(230, 330)
+	previewPane:SetSize(370, 360)
 	previewPane:SetPoint("TOPRIGHT", -28, -50)
 	BuildPreview(previewPane)
 
