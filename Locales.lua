@@ -770,26 +770,6 @@ local badgeText = {
 for code, texts in pairs(badgeText) do
 	locales[code].PROGRESS_BADGE, locales[code].PROGRESS_BADGE_TIP = texts[1], texts[2]
 end
-
--- Badge look: shape, border thickness, colours.
-local badgeLook = {
-	enUS = { BADGE_SHAPE = "Badge shape", SHAPE_square = "Square", SHAPE_rounded = "Rounded", SHAPE_pill = "Pill",
-		BADGE_BORDER = "Border thickness", BADGE_COLOR = "Badge color", BADGE_BORDER_COLOR = "Border color" },
-	ptBR = { BADGE_SHAPE = "Formato do badge", SHAPE_square = "Quadrado", SHAPE_rounded = "Arredondado", SHAPE_pill = "Pílula",
-		BADGE_BORDER = "Espessura da borda", BADGE_COLOR = "Cor do badge", BADGE_BORDER_COLOR = "Cor da borda" },
-	esES = { BADGE_SHAPE = "Forma de la insignia", SHAPE_square = "Cuadrada", SHAPE_rounded = "Redondeada", SHAPE_pill = "Píldora",
-		BADGE_BORDER = "Grosor del borde", BADGE_COLOR = "Color de la insignia", BADGE_BORDER_COLOR = "Color del borde" },
-	deDE = { BADGE_SHAPE = "Form des Abzeichens", SHAPE_square = "Eckig", SHAPE_rounded = "Abgerundet", SHAPE_pill = "Pille",
-		BADGE_BORDER = "Randstärke", BADGE_COLOR = "Abzeichenfarbe", BADGE_BORDER_COLOR = "Randfarbe" },
-	frFR = { BADGE_SHAPE = "Forme du badge", SHAPE_square = "Carré", SHAPE_rounded = "Arrondi", SHAPE_pill = "Pastille",
-		BADGE_BORDER = "Épaisseur du bord", BADGE_COLOR = "Couleur du badge", BADGE_BORDER_COLOR = "Couleur du bord" },
-	itIT = { BADGE_SHAPE = "Forma del badge", SHAPE_square = "Quadrato", SHAPE_rounded = "Arrotondato", SHAPE_pill = "Pillola",
-		BADGE_BORDER = "Spessore del bordo", BADGE_COLOR = "Colore del badge", BADGE_BORDER_COLOR = "Colore del bordo" },
-}
-for code, keys in pairs(badgeLook) do
-	for k, v in pairs(keys) do locales[code][k] = v end
-end
-
 -- Icon anchor: which side of the nameplate the icon sits on.
 local anchorText = {
 	enUS = { ICON_ANCHOR = "Anchor", ANCHOR_top = "Top", ANCHOR_bottom = "Bottom", ANCHOR_left = "Left", ANCHOR_right = "Right" },
