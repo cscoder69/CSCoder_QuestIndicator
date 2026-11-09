@@ -1465,8 +1465,8 @@ end
 -- setup guide); all of them follow every change.
 local previews = {}
 
-local function BuildPreview(pane)
-	local p = {}
+local function BuildPreview(pane, width)
+	local p = { width = width } -- known width: anchored frames can report 0 before the first layout
 	previews[#previews + 1] = p
 	local heading = pane:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	heading:SetPoint("TOPLEFT", 2, 0)
@@ -1538,7 +1538,7 @@ local function ApplyPlateGeometry(p)
 	if geom and geom.eff then ratio = geom.eff / p.box:GetEffectiveScale() end
 	-- A big plate (or a small UI scale) would fill the box and push side-anchored icons out of
 	-- view: then the whole scene shrinks, plate and icon together, so proportions still match.
-	local boxWidth = geom and geom.w and p.box:GetWidth()
+	local boxWidth = geom and geom.w and (p.width or p.box:GetWidth())
 	if boxWidth and boxWidth > 0 then ratio = math.min(ratio, boxWidth * 0.45 / geom.w) end
 	if geom then
 		p.plate:SetSize(geom.w * ratio, geom.h * ratio)
@@ -2059,7 +2059,7 @@ local function BuildPanel()
 	local pane = CreateFrame("Frame", nil, window)
 	pane:SetPoint("TOPLEFT", 14, -12)
 	pane:SetPoint("BOTTOMRIGHT", -14, 14)
-	BuildPreview(pane)
+	BuildPreview(pane, PREVIEW_WIDTH - 28)
 	window:Hide()
 
 	local function PlaceWindow()
@@ -2256,7 +2256,7 @@ local function BuildWizard()
 	local previewPane = CreateFrame("Frame", nil, f)
 	previewPane:SetSize(370, 360)
 	previewPane:SetPoint("TOPRIGHT", -28, -50)
-	BuildPreview(previewPane)
+	BuildPreview(previewPane, 370)
 
 	dropdownHost = f -- the guide's dropdown lists open over the guide, not the hidden panel
 	local pages = {}
@@ -2293,13 +2293,24 @@ local function BuildWizard()
 	configure:SetPoint("BOTTOMLEFT", welcome, "BOTTOM", 8, 40)
 	Loc(configure, "WIZ_CONFIGURE")
 
-	-- 2. Icon.
-	local iconPage = NewPage()
-	AddWizardText(iconPage, "WIZ_ICON_TITLE", "WIZ_ICON_TEXT")
-	AddIconPicker(iconPage, 28, -136)
-	AddSlider(iconPage, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, 32, -206, "%.2f")
-	AddCheck(iconPage, "FLOAT", "WIZ_FLOAT_TIP", "bounce", 28, -268)
-	AddCheck(iconPage, "GLOW_SECTION", "WIZ_GLOW_TIP", "glow", 28, -318)
+	-- 2. The icon's whole look on one page: icon, size, side of the plate, X/Y, float, glow.
+	local lookPage = NewPage()
+	AddWizardText(lookPage, "WIZ_LOOK_TITLE", "WIZ_LOOK_TEXT")
+	AddIconPicker(lookPage, 28, -112)
+	local lookDefault = CreateFrame("Button", nil, lookPage, "UIPanelButtonTemplate")
+	lookDefault:SetSize(130, 24)
+	lookDefault:SetPoint("TOPLEFT", 300, -124)
+	Loc(lookDefault, "WIZ_LOOK_DEFAULT")
+	lookDefault:SetScript("OnClick", function()
+		ResetKeys({ "style", "scale", "anchor", "offsetX", "offset", "bounce", "glow" })
+		AfterReset()
+	end)
+	AddSlider(lookPage, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, 32, -172, "%.2f")
+	AddAnchorMenu(lookPage, "anchor", "offsetX", "offset", 32, -216, Always)
+	AddSlider(lookPage, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, 32, -272, "%d")
+	AddSlider(lookPage, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, 32, -314, "%d")
+	AddCheck(lookPage, "FLOAT", nil, "bounce", 28, -358)
+	AddCheck(lookPage, "GLOW_SECTION", nil, "glow", 220, -358)
 
 	-- 3. What to show.
 	local showPage = NewPage()
@@ -2308,13 +2319,6 @@ local function BuildWizard()
 	AddCheck(showPage, "QUEST_ITEMS", "WIZ_ITEMS_TIP", "objects", 28, -176)
 	AddCheck(showPage, "PROGRESS", "PROGRESS_TIP", "progress", 28, -226)
 	AddCheck(showPage, "SOUND", "SOUND_TIP", "sound", 28, -276)
-
-	-- 4. Where it shows.
-	local placePage = NewPage()
-	AddWizardText(placePage, "WIZ_PLACE_TITLE", "WIZ_PLACE_TEXT")
-	AddAnchorMenu(placePage, "anchor", "offsetX", "offset", 32, -136, Always)
-	AddSlider(placePage, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, 32, -196, "%d")
-	AddSlider(placePage, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, 32, -240, "%d")
 
 	-- 5. Done.
 	local donePage = NewPage()

@@ -93,7 +93,8 @@ live in game after `/reload`.
 - **Setup guide** (`BuildWizard`, `ShowWizard`, `/cqi setup`): shown 3 s after login the first time on
   a character (`root.setupSeen[charKey]`; chars from before it existed are marked seen on update).
   Page 1 = logo (`icons/logo.tga`, made by `tools/make_logo_tga.ps1`), greeting, "Use default
-  settings" / "Configure". Configure = Icon, What to show, Where (anchor + X/Y), Done, each beside
+  settings" / "Configure". Configure = Look (icon, size, anchor, X/Y, float, glow + "Use default";
+  the user wants it all on one page), What to show, Done, each beside
   its own live preview (`previews` list: `BuildPreview` can make several). Any close marks it seen.
   Texts are English only until the user approves the layout.
 - **Icon anchor** (`anchor`, `objectAnchor`): top/bottom/left/right of the plate; side anchors use
