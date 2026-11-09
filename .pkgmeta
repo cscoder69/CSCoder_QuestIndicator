@@ -2,5 +2,7 @@ package-as: CSCoder_QuestIndicator
 
 ignore:
   - media
+  - tools
   - README.md
+  - CLAUDE.md
   - .github

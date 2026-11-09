@@ -1,0 +1,126 @@
+-- Minimal WoW API mock to smoke-test the addon outside the game.
+-- usage: luajit wowmock.lua <addon dir>
+local dir = arg[1]
+local frames, errors, missing = {}, {}, {}
+
+local function newObject(kind)
+	local o = { _scripts = {}, _kind = kind, _text = "", _shown = true, _value = 0 }
+	frames[#frames + 1] = o
+	return setmetatable(o, { __index = function(_, k)
+		if k == "Text" or k == "text" then return nil end
+		return function(self, ...)
+			local a = { ... }
+			if k == "SetScript" then self._scripts[a[1]] = a[2]
+			elseif k == "HookScript" then local old = self._scripts[a[1]]; self._scripts[a[1]] = function(...) if old then old(...) end a[2](...) end
+			elseif k == "GetScript" then return self._scripts[a[1]]
+			elseif k:match("^Create") or k == "GetHighlightTexture" then return newObject(k)
+			elseif k == "SetText" then self._text = a[1]
+			elseif k == "GetText" then return self._text
+			elseif k == "SetShown" then self._shown = a[1]
+			elseif k == "Show" then self._shown = true
+			elseif k == "Hide" then self._shown = false
+			elseif k == "IsShown" or k == "IsVisible" then return self._shown
+			elseif k == "SetValue" then self._value = a[1]; if self._scripts.OnValueChanged then self._scripts.OnValueChanged(self, a[1]) end
+			elseif k == "GetValue" then return self._value
+			elseif k == "SetChecked" then self._checked = a[1]
+			elseif k == "GetChecked" then return self._checked
+			elseif k == "GetFrameStrata" then return "HIGH"
+			elseif k == "GetFrameLevel" then return 1
+			elseif k == "GetWidth" then return 140
+			elseif k == "GetStringWidth" then return 80
+			elseif k == "GetCenter" then return 100, 100
+			elseif k == "GetEffectiveScale" then return 1
+			elseif k == "IsPlaying" then return false
+			elseif k == "GetID" then return 42
+			elseif k == "GetName" then return nil
+			elseif k == "NumLines" then return 0
+			elseif k == "GetParent" then return self._parent or UIParent
+			elseif k == "SetParent" then self._parent = a[1]
+			end
+		end
+	end })
+end
+
+local env = setmetatable({}, { __index = function(t, k)
+	local v = rawget(_G, k)
+	if v == nil then missing[k] = true end
+	return v
+end })
+
+env.CreateFrame = function(kind, name) local f = newObject(kind); if name then rawset(env, name, f) end return f end
+env.UIParent, env.WorldFrame, env.Minimap, env.GameTooltip = newObject("UIParent"), newObject("WorldFrame"), newObject("Minimap"), newObject("GameTooltip")
+env.GetLocale = function() return rawget(env, "_locale") or "enUS" end
+env.UnitName = function() return "Tester" end
+env.GetRealmName = function() return "Realm" end
+env.UnitExists = function() return false end
+env.InCombatLockdown = function() return false end
+env.GetCursorPosition = function() return 150, 120 end
+env.GetTime = function() return 12.5 end
+env.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
+env.print = function(...) end
+env.C_Timer = { After = function(_, fn) fn() end }
+env.C_NamePlate = { GetNamePlates = function() return {} end, GetNamePlateForUnit = function() return nil end }
+env.C_QuestLog = { GetNumQuestLogEntries = function() return 0 end, GetInfo = function() return nil end, GetQuestObjectives = function() return {} end }
+env.C_CVar = { GetCVar = function() return "0" end, SetCVar = function() end }
+env.Settings = {
+	RegisterCanvasLayoutCategory = function() return newObject("Category") end,
+	RegisterCanvasLayoutSubcategory = function() return newObject("Category") end,
+	RegisterAddOnCategory = function() end,
+	OpenToCategory = function() end,
+}
+env.BackdropTemplateMixin = {}
+env.Enum = { TooltipDataLineType = { QuestObjective = 8, QuestTitle = 17 } }
+env.SlashCmdList = {}
+-- Lua builtins the addon uses
+for _, k in ipairs({ "pairs", "ipairs", "type", "tostring", "tonumber", "table", "string", "math", "setmetatable", "pcall", "next", "select", "unpack" }) do rawset(env, k, _G[k]) end
+
+if arg[2] == "old" then env.CSCoderQuestIndicatorDB = { version = 4, scale = 2.0, offset = -12, style = "red", glow = true, savedCVars = { SoftTargetIconGameObject = "0" } } end
+local ns = {}
+for _, file in ipairs({ "Locales.lua", "CSCoder_QuestIndicator.lua" }) do
+	local chunk = assert(loadfile(dir .. "/" .. file))
+	setfenv(chunk, env)
+	chunk("CSCoder_QuestIndicator", ns)
+end
+
+local function try(label, fn, ...)
+	local ok, err = pcall(fn, ...)
+	if not ok then errors[#errors + 1] = label .. ": " .. tostring(err) end
+end
+
+local eventFrame
+for _, f in ipairs(frames) do if f._scripts.OnEvent then eventFrame = f end end
+try("ADDON_LOADED", eventFrame._scripts.OnEvent, eventFrame, "ADDON_LOADED", "CSCoder_QuestIndicator")
+try("PLAYER_LOGIN", eventFrame._scripts.OnEvent, eventFrame, "PLAYER_LOGIN")
+for _, ev in ipairs({ "QUEST_LOG_UPDATE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "CVAR_UPDATE", "PLAYER_SOFT_INTERACT_CHANGED" }) do
+	try(ev, eventFrame._scripts.OnEvent, eventFrame, ev, "SoftTargetInteract")
+end
+try("OnUpdate", eventFrame._scripts.OnUpdate, eventFrame, 2)
+
+-- Exercise every control a few times (snapshot: clicks may create frames).
+local snapshot = {}
+for i, f in ipairs(frames) do snapshot[i] = f end
+for _, f in ipairs(snapshot) do if f._kind == "EditBox" then f._text = "Raid" end end
+for round = 1, 3 do
+	for i, f in ipairs(snapshot) do
+		for _, script in ipairs({ "OnShow", "OnEnter", "OnLeave", "OnClick", "OnDragStart", "OnDragStop" }) do
+			if f._scripts[script] then try(script .. "#" .. i, f._scripts[script], f, round == 2 and "RightButton" or "LeftButton") end
+		end
+		if f._scripts.OnValueChanged then try("Slider#" .. i, f._scripts.OnValueChanged, f, 0.5 * round) end
+		if f._scripts.OnUpdate and f ~= eventFrame then try("OnUpdate#" .. i, f._scripts.OnUpdate, f, 0.1) end
+	end
+end
+try("slash", env.SlashCmdList.CSCODERQUESTINDICATOR, "toggle")
+try("slash open", env.SlashCmdList.CSCODERQUESTINDICATOR, "")
+
+local db = env.CSCoderQuestIndicatorDB
+local names = {}
+for name in pairs(db.profiles) do names[#names + 1] = name end
+print("profiles:", table.concat(names, ", "), "| char ->", db.chars["Tester - Realm"], "| language:", db.language)
+local known = { IsMouseButtonDown = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1 }
+local unexpected = {}
+for k in pairs(missing) do if not known[k] then unexpected[#unexpected + 1] = k end end
+print("unexpected nil globals:", #unexpected == 0 and "none" or table.concat(unexpected, ", "))
+print("errors:", #errors)
+for _, e in ipairs(errors) do print("  " .. e) end
+local p = db.profiles.Default
+print("Default: scale", p.scale, "offset", p.offset, "style", p.style, "glow", p.glow, "| root.scale", db.scale, "| savedCVars", db.savedCVars and db.savedCVars.SoftTargetIconGameObject)
