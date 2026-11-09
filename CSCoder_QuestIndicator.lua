@@ -2235,6 +2235,10 @@ local function MeasurePlate(unit, force)
 		else
 			geom.barTop = TopFromAnchors(bar, plate, frame, 0) -- positions are restricted here
 		end
+		if not geom.barTop then
+			-- Even anchors are restricted (WoW Forever): assume the bar sits in the middle of the plate.
+			geom.barTop, geom.barGuess = (h / frameScale - geom.barH) / 2, true
+		end
 		-- What the bar hangs from, for /cqi plate.
 		local ok, point, rel, relPoint, x, y = pcall(bar.GetPoint, bar, 1)
 		if ok and point then
@@ -2353,7 +2357,7 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 		print(string.format("|cffffd200%s|r plate %.0fx%.0f, base scale %.2f (plate x%.2f, frame x%.2f), bar %s",
 			TITLE, n(geom.w), n(geom.h), n(geom.eff), n(geom.plateScale), n(geom.frameScale),
 			geom.barW and string.format("%.0fx%.0f at %s from the top", n(geom.barW), n(geom.barH),
-				geom.barTop and string.format("%.0f", geom.barTop) or "?") or "not found"))
+				geom.barTop and string.format(geom.barGuess and "~%.0f (estimated)" or "%.0f", geom.barTop) or "?") or "not found"))
 		if geom.barAnchor then print("|cffffd200" .. TITLE .. "|r bar anchor: " .. geom.barAnchor) end
 	else
 		OpenPanel()
