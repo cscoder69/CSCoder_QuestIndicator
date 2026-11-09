@@ -21,4 +21,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Upload only for WoW Forever (Interface 16001 = 1.60.x), the client it is tested on.
       - uses: BigWigsMods/packager@v2
+        with:
+          args: -g forever
