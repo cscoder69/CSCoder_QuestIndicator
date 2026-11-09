@@ -2185,14 +2185,28 @@ local function Read(obj, method)
 	if ok then return a, b end
 end
 
--- How far below the top of its plate (or UnitFrame) the bar is anchored, from its anchor points.
-local function BarOffsetFromAnchors(bar, plate, frame)
-	local ok, count = pcall(bar.GetNumPoints, bar)
-	if not ok or type(count) ~= "number" then return end
+-- Where a point sits from the top of a region of height h ("TOPLEFT" 0, "LEFT" h/2, "BOTTOM" h).
+local function PointDepth(point, h)
+	if point:find("TOP") then return 0 elseif point:find("BOTTOM") then return h end
+	return h / 2
+end
+
+-- How far below the top of the plate a region's top is, following its anchors (bar -> container
+-- -> UnitFrame -> plate) when positions can't be measured. Assumes one scale along the chain.
+local function TopFromAnchors(region, plate, frame, depth)
+	if region == plate or region == frame then return 0 end
+	if depth > 4 then return end
+	local h = select(2, Read(region, "GetSize"))
+	local ok, count = pcall(region.GetNumPoints, region)
+	if not (h and ok and type(count) == "number") then return end
 	for i = 1, count do
-		local ok2, _, rel, relPoint, _, y = pcall(bar.GetPoint, bar, i)
-		if ok2 and (rel == plate or rel == frame) and type(relPoint) == "string" and relPoint:find("TOP") and type(y) == "number" then
-			return -y
+		local ok2, point, rel, relPoint, _, y = pcall(region.GetPoint, region, i)
+		if ok2 and type(point) == "string" and type(relPoint) == "string" and rel then
+			local relTop = TopFromAnchors(rel, plate, frame, depth + 1)
+			local relH = select(2, Read(rel, "GetSize"))
+			if relTop and relH then
+				return relTop + PointDepth(relPoint, relH) - (y or 0) - PointDepth(point, h)
+			end
 		end
 	end
 end
@@ -2219,7 +2233,14 @@ local function MeasurePlate(unit, force)
 		if plateTop and barTop then
 			geom.barTop = (plateTop * eff - barTop * barEff) / unitScale
 		else
-			geom.barTop = BarOffsetFromAnchors(bar, plate, frame) -- positions are restricted here
+			geom.barTop = TopFromAnchors(bar, plate, frame, 0) -- positions are restricted here
+		end
+		-- What the bar hangs from, for /cqi plate.
+		local ok, point, rel, relPoint, x, y = pcall(bar.GetPoint, bar, 1)
+		if ok and point then
+			local relName = rel == plate and "plate" or rel == frame and "UnitFrame"
+				or (rel and Read(rel, "GetDebugName")) or (rel and Read(rel, "GetName")) or tostring(rel)
+			geom.barAnchor = string.format("%s -> %s %s (%s, %s)", tostring(point), tostring(relName), tostring(relPoint), tostring(x), tostring(y))
 		end
 	end
 	root.plateGeom = geom
@@ -2333,6 +2354,7 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 			TITLE, n(geom.w), n(geom.h), n(geom.eff), n(geom.plateScale), n(geom.frameScale),
 			geom.barW and string.format("%.0fx%.0f at %s from the top", n(geom.barW), n(geom.barH),
 				geom.barTop and string.format("%.0f", geom.barTop) or "?") or "not found"))
+		if geom.barAnchor then print("|cffffd200" .. TITLE .. "|r bar anchor: " .. geom.barAnchor) end
 	else
 		OpenPanel()
 	end
