@@ -758,18 +758,6 @@ for code, keys in pairs(textFormat) do
 	for k, v in pairs(keys) do locales[code][k] = v end
 end
 
--- Progress badge.
-local badgeText = {
-	enUS = { "Show in a badge", "The count inside a dark pill with a gold border." },
-	ptBR = { "Mostrar num badge", "A contagem dentro de uma pílula escura com borda dourada." },
-	esES = { "Mostrar en una insignia", "El contador dentro de una píldora oscura con borde dorado." },
-	deDE = { "Als Abzeichen anzeigen", "Der Zähler in einer dunklen Pille mit goldenem Rand." },
-	frFR = { "Afficher dans un badge", "Le compteur dans une pastille sombre au bord doré." },
-	itIT = { "Mostra in un badge", "Il contatore in una pillola scura con bordo dorato." },
-}
-for code, texts in pairs(badgeText) do
-	locales[code].PROGRESS_BADGE, locales[code].PROGRESS_BADGE_TIP = texts[1], texts[2]
-end
 -- Icon anchor: which side of the nameplate the icon sits on.
 local anchorText = {
 	enUS = { ICON_ANCHOR = "Anchor", ANCHOR_top = "Top", ANCHOR_bottom = "Bottom", ANCHOR_left = "Left", ANCHOR_right = "Right" },
