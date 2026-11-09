@@ -1,0 +1,5 @@
+package-as: CSCoder_QuestIndicator
+
+ignore:
+  - media
+  - README.md
