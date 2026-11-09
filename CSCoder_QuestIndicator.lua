@@ -1536,6 +1536,10 @@ end
 local function ApplyPlateGeometry(p)
 	local geom, ratio = root and root.plateGeom, 1
 	if geom and geom.eff then ratio = geom.eff / p.box:GetEffectiveScale() end
+	-- A big plate (or a small UI scale) would fill the box and push side-anchored icons out of
+	-- view: then the whole scene shrinks, plate and icon together, so proportions still match.
+	local boxWidth = geom and geom.w and p.box:GetWidth()
+	if boxWidth and boxWidth > 0 then ratio = math.min(ratio, boxWidth * 0.45 / geom.w) end
 	if geom then
 		p.plate:SetSize(geom.w * ratio, geom.h * ratio)
 		if geom.barW then
