@@ -69,6 +69,10 @@ live in game after `/reload`.
     "lsm:<name>", looked up lazily, no embedded lib), colour "progress" (`ProgressColor`, off by
     default), shadow check (off by default). Dropdowns wrap long lists into columns
     (`DROPDOWN_MAX_ROWS`) and can draw entries in their own font (`fontFor`).
+  - Badge (branch experiment/badge, 2026-11-09): progress text in a badge; shape square/rounded/pill
+    (`BADGE_SHAPES`, caps `icons/badge/*.tga` made by `tools/make_badge.lua`, `ShapeLayer`), border
+    thickness, fill and border colours via the game colour picker (`OpenColorPicker`, both APIs,
+    `AddColorSwatch`). Colour settings are {r,g,b,a} tables, always replaced, never edited in place.
   - (Older layout notes below.)
   - Left: a box of **four Ace3-style tabs** (game textures `UI-OptionsFrame-ActiveTab/InActiveTab`,
     tabs stretched to fill, like BlizzMove): **Display** (Enable addon; Quest mobs ☑ + size, horizontal

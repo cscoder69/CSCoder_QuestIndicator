@@ -70,6 +70,12 @@ env.Settings = {
 	OpenToCategory = function() end,
 }
 env.BackdropTemplateMixin = {}
+-- Colour picker (current API): reports a green the moment it opens.
+env.ColorPickerFrame = {
+	GetColorRGB = function() return 0.1, 0.8, 0.1 end,
+	GetColorAlpha = function() return 1 end,
+	SetupColorPickerAndShow = function(self, info) info.swatchFunc() end,
+}
 env.Enum = { TooltipDataLineType = { QuestObjective = 8, QuestTitle = 17 } }
 env.SlashCmdList = {}
 -- Lua builtins the addon uses
@@ -150,3 +156,5 @@ for _, e in ipairs(errors) do print("  " .. e) end
 local pname = db.profiles.Default and "Default" or db.chars["Tester - Realm"]
 local p = db.profiles[pname]
 print(pname .. ": scale", p.scale, "offset", p.offset, "style", p.style, "glow", p.glow, "| root.scale", db.scale, "| savedCVars", db.savedCVars and db.savedCVars.SoftTargetIconGameObject)
+local bc = p.badgeColor or {}
+print("badge:", p.badgeShape, "border", p.badgeBorderSize, "fill", bc[1], bc[2], bc[3], bc[4])

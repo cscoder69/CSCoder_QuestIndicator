@@ -31,7 +31,11 @@ local DEFAULTS = {
 	progressColor = "white",   -- "white", "gold", "green", "kind" (same colour as the icon) or "progress" (red to green)
 	progressFormat = "slash",  -- "slash" 8/12, "spaced" 8 / 12, "both" 8/12 (67%), "percent" 67%, "left" 4 left
 	progressShadow = false,   -- drop shadow behind the text
-	progressBadge = true,     -- the text sits in a badge (dark pill, gold border) -- experiment
+	progressBadge = true,     -- the text sits in a badge -- experiment
+	badgeShape = "rounded",   -- "square", "rounded" or "pill"
+	badgeBorderSize = 1,      -- border thickness in pixels (0 = none)
+	badgeColor = { 0.05, 0.04, 0.02, 0.85 },  -- fill (r, g, b, a); replaced, never changed in place
+	badgeBorderColor = { 1, 0.82, 0, 0.9 },   -- border
 	progressX = 36,      -- its X
 	progressY = 0,       -- its Y
 	bounce = true,       -- floating up/down animation
@@ -98,9 +102,63 @@ local KIND_TINT = { daily = { 0.55, 0.8, 1 }, group = { 1, 0.5, 0.45 } }
 local TEXT_FONTS = { friz = "Fonts\\FRIZQT__.TTF", arial = "Fonts\\ARIALN.TTF", skurri = "Fonts\\skurri.ttf", morpheus = "Fonts\\MORPHEUS.TTF" }
 local TEXT_FONT_ORDER = { "friz", "arial", "skurri", "morpheus" }
 local PROGRESS_FORMATS = { "slash", "spaced", "both", "percent", "left" }
-local BADGE_BACKDROP = { bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-	tile = true, tileSize = 16, edgeSize = 10, insets = { left = 2, right = 2, top = 2, bottom = 2 } }
-local BADGE_PAD_X, BADGE_PAD_Y = 8, 5
+-- Badge behind the progress text: a border shape with the fill shape inset by the border
+-- thickness. Rounded and pill ends are white cap textures (left end; the right end is the same
+-- texture mirrored), tinted and stretched to the badge height; the middle is a plain colour.
+local BADGE_PAD_X, BADGE_PAD_Y = 8, 4
+local BADGE_SHAPES = { "square", "rounded", "pill" }
+local BADGE_CAPS = {
+	rounded = { file = "badge\\rounded", ratio = 16 / 64 }, -- cap width / height
+	pill = { file = "badge\\pill", ratio = 32 / 64 },
+}
+
+local function BadgeLayer(text, layer, sublevel)
+	local left = text:CreateTexture(nil, layer, nil, sublevel)
+	local middle = text:CreateTexture(nil, layer, nil, sublevel)
+	local right = text:CreateTexture(nil, layer, nil, sublevel)
+	return { left = left, middle = middle, right = right }
+end
+
+-- Lays out one layer (border or fill) inside the text frame, inset by `inset` pixels.
+local function ShapeLayer(parts, text, shape, inset, width, height, color)
+	local r, g, b, a = color[1], color[2], color[3], color[4] or 1
+	local h = height - inset * 2
+	local cap = BADGE_CAPS[shape]
+	parts.middle:ClearAllPoints()
+	parts.middle:SetColorTexture(r, g, b, a)
+	if not cap or h <= 0 then
+		parts.left:Hide(); parts.right:Hide()
+		parts.middle:SetPoint("TOPLEFT", text, "TOPLEFT", inset, -inset)
+		parts.middle:SetPoint("BOTTOMRIGHT", text, "BOTTOMRIGHT", -inset, inset)
+		parts.middle:SetShown(h > 0)
+		return
+	end
+	local capWidth = math.min(h * cap.ratio, (width - inset * 2) / 2)
+	for _, side in ipairs({ "left", "right" }) do
+		local tex = parts[side]
+		tex:SetTexture(IconPath(cap.file))
+		tex:SetVertexColor(r, g, b, a)
+		tex:SetSize(capWidth, h)
+		tex:ClearAllPoints()
+		if side == "left" then
+			tex:SetTexCoord(0, 1, 0, 1)
+			tex:SetPoint("LEFT", text, "LEFT", inset, 0)
+		else
+			tex:SetTexCoord(1, 0, 0, 1)
+			tex:SetPoint("RIGHT", text, "RIGHT", -inset, 0)
+		end
+		tex:Show()
+	end
+	parts.middle:SetPoint("TOPLEFT", parts.left, "TOPRIGHT")
+	parts.middle:SetPoint("BOTTOMRIGHT", parts.right, "BOTTOMLEFT")
+	parts.middle:Show()
+end
+
+local function ShowBadge(text, show)
+	for _, layer in ipairs({ text.badgeBorder, text.badgeFill }) do
+		for _, tex in pairs(layer) do tex:SetShown(show) end
+	end
+end
 
 local TEXT_OUTLINES = { none = "", thin = "OUTLINE", thick = "THICKOUTLINE" }
 local TEXT_COLORS = { white = { 1, 1, 1 }, gold = { 1, 0.82, 0 }, green = { 0.3, 1, 0.3 } }
@@ -407,14 +465,20 @@ local function StyleIcon(f)
 		color = color or TEXT_COLORS.white
 		label:SetTextColor(color[1], color[2], color[3])
 		label:SetText(shown)
-		-- Badge: a dark pill sized to the text, with a gold border.
-		if db.progressBadge and text.SetBackdrop then
-			text:SetBackdrop(BADGE_BACKDROP)
-			text:SetBackdropColor(0.05, 0.04, 0.02, 0.85)
-			text:SetBackdropBorderColor(1, 0.82, 0, 0.9)
-			text:SetSize((label:GetStringWidth() or 30) + BADGE_PAD_X * 2, (label:GetStringHeight() or 12) + BADGE_PAD_Y * 2)
+		-- Badge: the chosen shape sized to the text, in the chosen fill and border colours.
+		if db.progressBadge then
+			local height = math.floor((label:GetStringHeight() or 12) + BADGE_PAD_Y * 2 + 0.5)
+			local width = math.floor((label:GetStringWidth() or 30) + BADGE_PAD_X * 2 + 0.5)
+			if BADGE_CAPS[db.badgeShape] then width = width + height * BADGE_CAPS[db.badgeShape].ratio * 0.6 end
+			width = math.max(width, height)
+			text:SetSize(width, height)
+			local border = db.badgeBorderSize or 0
+			ShapeLayer(text.badgeBorder, text, db.badgeShape, 0, width, height, border > 0 and db.badgeBorderColor or { 0, 0, 0, 0 })
+			ShapeLayer(text.badgeFill, text, db.badgeShape, border, width, height, db.badgeColor)
+			ShowBadge(text, true)
+			if border == 0 then for _, tex in pairs(text.badgeBorder) do tex:Hide() end end
 		else
-			if text.SetBackdrop then text:SetBackdrop(nil) end
+			ShowBadge(text, false)
 			text:SetSize(60, 20)
 		end
 		text:SetScale(1 / scale)
@@ -467,9 +531,12 @@ local function CreateIcon()
 	icon:SetAllPoints()
 	f.icon = icon
 
-	-- Backdrop template so the progress text can sit in a badge (dark pill, gold border).
-	local text = CreateFrame("Frame", nil, f, BackdropTemplateMixin and "BackdropTemplate" or nil)
+	local text = CreateFrame("Frame", nil, f)
 	text:SetSize(60, 20)
+	-- Badge layers under the text (see ShapeLayer): border, then the fill on top of it.
+	text.badgeBorder = BadgeLayer(text, "BACKGROUND", 1)
+	text.badgeFill = BadgeLayer(text, "BORDER", 1)
+	ShowBadge(text, false)
 	text.label = text:CreateFontString(nil, "OVERLAY")
 	text.label:SetPoint("CENTER")
 	text.label:SetFont(TEXT_FONTS.friz, DEFAULTS.progressSize, "OUTLINE")
@@ -975,6 +1042,71 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 		end
 	end)
 	return slider, title, input
+end
+
+-- Opens the game's colour picker (with opacity) on `color` ({ r, g, b, a }); onChange gets a
+-- new table on every change, and the original back on cancel. Handles both the current
+-- picker API (SetupColorPickerAndShow) and the older one (fields + Show).
+local function OpenColorPicker(color, onChange)
+	local picker = _G.ColorPickerFrame
+	if not picker then return end
+	local r, g, b, a = color[1], color[2], color[3], color[4] or 1
+	local function Current()
+		local nr, ng, nb = picker:GetColorRGB()
+		local na = a
+		if picker.GetColorAlpha then
+			na = picker:GetColorAlpha()
+		elseif _G.OpacitySliderFrame then
+			na = 1 - _G.OpacitySliderFrame:GetValue() -- the old slider holds transparency
+		end
+		onChange({ nr, ng, nb, na })
+	end
+	local function Cancel() onChange({ r, g, b, a }) end
+	if picker.SetupColorPickerAndShow then
+		picker:SetupColorPickerAndShow({ r = r, g = g, b = b, opacity = a, hasOpacity = true,
+			swatchFunc = Current, opacityFunc = Current, cancelFunc = Cancel })
+	else
+		picker.func, picker.opacityFunc, picker.cancelFunc = Current, Current, Cancel
+		picker.hasOpacity, picker.opacity, picker.previousValues = true, 1 - a, { r, g, b, a }
+		picker:SetColorRGB(r, g, b)
+		picker:Hide()
+		picker:Show()
+	end
+end
+
+-- A colour swatch with its label; a click opens the colour picker for db[settingKey].
+local function AddColorSwatch(parent, labelKey, settingKey, x, y)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(22, 22)
+	b:SetPoint("TOPLEFT", x, y)
+	local edge = b:CreateTexture(nil, "BACKGROUND")
+	edge:SetAllPoints()
+	edge:SetColorTexture(0.7, 0.7, 0.7, 1)
+	local checker = b:CreateTexture(nil, "BORDER") -- dark under the colour, so transparency shows
+	checker:SetPoint("TOPLEFT", 2, -2)
+	checker:SetPoint("BOTTOMRIGHT", -2, 2)
+	checker:SetColorTexture(0.15, 0.15, 0.15, 1)
+	local swatch = b:CreateTexture(nil, "ARTWORK")
+	swatch:SetPoint("TOPLEFT", 2, -2)
+	swatch:SetPoint("BOTTOMRIGHT", -2, 2)
+	local label = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	label:SetPoint("LEFT", b, "RIGHT", 8, 0)
+	Loc(label, labelKey)
+	b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	local function Sync()
+		local c = db[settingKey] or DEFAULTS[settingKey]
+		swatch:SetColorTexture(c[1], c[2], c[3], c[4] or 1)
+	end
+	b:SetScript("OnClick", function()
+		OpenColorPicker(db[settingKey] or DEFAULTS[settingKey], function(color)
+			db[settingKey] = color
+			Sync()
+			ApplySettings()
+		end)
+	end)
+	refreshers[#refreshers + 1] = Sync
+	parent:HookScript("OnShow", Sync)
+	return b, label
 end
 
 -- A section heading with its own on/off check on the left.
@@ -1507,7 +1639,8 @@ local PREVIEW_WIDTH, PREVIEW_HEIGHT = 240, 340 -- the preview window
 local DISPLAY_KEYS = { "active", "enabled", "objects", "scale", "offsetX", "offset", "objectScale", "objectOffsetX", "objectOffset" }
 local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "glowAlpha" }
 local PROGRESS_KEYS = { "progress", "progressAttach", "progressFloat", "progressSize", "progressFont",
-	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressBadge", "progressX", "progressY" }
+	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressBadge", "badgeShape", "badgeBorderSize", "badgeColor", "badgeBorderColor",
+	"progressX", "progressY" }
 local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice" }
 
 local function ResetKeys(keys)
@@ -1599,6 +1732,15 @@ local function BuildProgressTab(tab)
 	local function FreeTextOn() return ProgressOn() and not db.progressAttach end
 	Gate(FreeTextOn, AddSlider(tab, "POS_X", "progressX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, TOP - 270, "%d"))
 	Gate(FreeTextOn, AddSlider(tab, "POS_Y", "progressY", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, TOP - 270, "%d"))
+
+	-- Badge look: shape and border thickness, then fill and border colours (the text colour is above).
+	local function BadgeOn() return ProgressOn() and db.progressBadge end
+	Gate(BadgeOn, AddDropdown(tab, "BADGE_SHAPE", BADGE_SHAPES,
+		function(value) return L["SHAPE_" .. value] end, Choice("badgeShape"), SetChoice("badgeShape"),
+		COL1 + 4, TOP - 322, COLUMN_DROPDOWN))
+	Gate(BadgeOn, AddSlider(tab, "BADGE_BORDER", "badgeBorderSize", 0, 4, 1, COL2 + 4, TOP - 322, "%d"))
+	Gate(BadgeOn, AddColorSwatch(tab, "BADGE_COLOR", "badgeColor", COL1 + 4, TOP - 376))
+	Gate(BadgeOn, AddColorSwatch(tab, "BADGE_BORDER_COLOR", "badgeBorderColor", COL2 + 4, TOP - 376))
 end
 
 local function BuildIconTab(tab)
@@ -1760,7 +1902,7 @@ end
 local SETTINGS_SECTIONS = {
 	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 200 },
 	{ key = "TAB_ICON", build = BuildIconTab, height = 184 },
-	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 310 },
+	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 404 },
 	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 152 },
 }
 local SECTION_GAP = 18
