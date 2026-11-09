@@ -19,6 +19,8 @@ local DEFAULTS = {
 	scale = 1.5,         -- mob icon size
 	offsetX = 0,         -- mob icon X
 	offset = -15,        -- mob icon Y (above the nameplate)
+	anchor = "top",      -- mob icon side of the nameplate: "top", "bottom", "left", "right"
+	objectAnchor = "top", -- object icon side of its nameplate
 	objectScale = 1.5,   -- object icon size
 	objectOffsetX = 0,   -- object icon X
 	objectOffset = 10,   -- object icon Y (above the object)
@@ -497,13 +499,28 @@ local function StyleIcon(f)
 	if not db.bounce then f.inner:SetPoint("CENTER", f, "CENTER", 0, 0) end
 end
 
+-- Where the icon sits around the nameplate; X/Y move it from there. "top" keeps the plate frame
+-- as before; the other sides use the health bar (the part you see) when the plate has one.
+local ICON_ANCHORS = { top = { "BOTTOM", "TOP" }, bottom = { "TOP", "BOTTOM" }, left = { "RIGHT", "LEFT" }, right = { "LEFT", "RIGHT" } }
+local ICON_ANCHOR_ORDER = { "top", "bottom", "left", "right" }
+
+local function PlateBar(plate)
+	if plate.previewBar then return plate.previewBar end
+	local frame = plate.UnitFrame
+	return frame and (frame.healthBar or frame.HealthBar or (frame.HealthBarsContainer and frame.HealthBarsContainer.healthBar))
+end
+
 local function AnchorIcon(f, plate)
 	f:ClearAllPoints()
+	local anchor, x, y
 	if f.isObject then
-		f:SetPoint("BOTTOM", plate, "TOP", db.objectOffsetX, db.objectOffset)
+		anchor, x, y = db.objectAnchor, db.objectOffsetX, db.objectOffset
 	else
-		f:SetPoint("BOTTOM", plate, "TOP", db.offsetX, db.offset)
+		anchor, x, y = db.anchor, db.offsetX, db.offset
 	end
+	local points = ICON_ANCHORS[anchor] or ICON_ANCHORS.top
+	local target = (anchor ~= "top" and PlateBar(plate)) or plate
+	f:SetPoint(points[1], target, points[2], x, y)
 end
 
 local function CreateIcon()
@@ -803,6 +820,9 @@ local function FillDefaults(profile)
 	profile.cursor = nil -- removed option
 	profile.style = OLD_STYLES[profile.style] or profile.style
 	if not VALID_STYLE[profile.style] then profile.style = DEFAULT_STYLE end
+	for _, key in ipairs({ "anchor", "objectAnchor" }) do
+		if not ICON_ANCHORS[profile[key]] then profile[key] = "top" end
+	end
 	return profile
 end
 
@@ -1485,6 +1505,7 @@ local function BuildPreview(pane)
 	preview.object:SetParent(item)
 	preview.object.plate, preview.object.isPreview, preview.object.isObject, preview.object.kind = item, true, true, "normal"
 	preview.box, preview.plate, preview.bar = box, plate, bar
+	plate.previewBar = bar -- side anchors use the bar, as on real plates
 	box:SetScript("OnShow", function() UpdatePreview() end)
 end
 
@@ -1498,8 +1519,10 @@ local function ApplyPlateGeometry()
 		preview.plate:SetSize(geom.w * ratio, geom.h * ratio)
 		if geom.barW then
 			preview.bar:SetSize(geom.barW * ratio, geom.barH * ratio)
-			preview.bar:ClearAllPoints()
-			preview.bar:SetPoint("TOP", preview.plate, "TOP", 0, -geom.barTop * ratio)
+			if geom.barTop then
+				preview.bar:ClearAllPoints()
+				preview.bar:SetPoint("TOP", preview.plate, "TOP", 0, -geom.barTop * ratio)
+			end
 		end
 	end
 	preview.mob.previewRatio = ratio
@@ -1636,7 +1659,8 @@ local OPTIONS_WIDTH = 404 -- the tabbed box on the left
 local PREVIEW_WIDTH, PREVIEW_HEIGHT = 240, 340 -- the preview window
 
 -- Settings each tab owns, for its "Reset this tab" button.
-local DISPLAY_KEYS = { "active", "enabled", "objects", "scale", "offsetX", "offset", "objectScale", "objectOffsetX", "objectOffset" }
+local DISPLAY_KEYS = { "active", "enabled", "objects", "anchor", "scale", "offsetX", "offset",
+	"objectAnchor", "objectScale", "objectOffsetX", "objectOffset" }
 local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "glowAlpha" }
 local PROGRESS_KEYS = { "progress", "progressAttach", "progressFloat", "progressSize", "progressFont",
 	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressBadge", "badgeShape", "badgeBorderSize", "badgeColor", "badgeBorderColor",
@@ -1688,16 +1712,33 @@ local function BuildDisplayTab(tab)
 	AddResetTabButton(tab, function() ResetKeys(DISPLAY_KEYS) end)
 	AddCheck(tab, "ENABLE_ADDON", "ENABLE_ADDON_TIP", "active", COL1, TOP)
 
+	-- Anchor menu: which side of the nameplate the icon sits on. Picking a side starts X/Y from
+	-- that side (the defaults for "top", zero for the others), so the icon lands right there.
+	local function AnchorMenu(key, xKey, yKey, x, y, gate)
+		Gate(gate, AddDropdown(tab, "ICON_ANCHOR", ICON_ANCHOR_ORDER, function(value) return L["ANCHOR_" .. value] end,
+			function() return db[key] end,
+			function(value)
+				if db[key] ~= value then
+					db[key] = value
+					db[xKey] = value == "top" and DEFAULTS[xKey] or 0
+					db[yKey] = value == "top" and DEFAULTS[yKey] or 0
+				end
+				ApplySettings(); RefreshControls()
+			end, x, y, COLUMN_DROPDOWN))
+	end
+
 	local y = TOP - 58
 	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_MOBS", "enabled", COL1, y))
-	Gate(MobsOn, AddSlider(tab, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, COL1 + 4, y - 22, "%.2f"))
-	Gate(MobsOn, AddSlider(tab, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 62, "%d"))
-	Gate(MobsOn, AddSlider(tab, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 102, "%d"))
+	AnchorMenu("anchor", "offsetX", "offset", COL1 + 4, y - 26, MobsOn)
+	Gate(MobsOn, AddSlider(tab, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, COL1 + 4, y - 80, "%.2f"))
+	Gate(MobsOn, AddSlider(tab, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 120, "%d"))
+	Gate(MobsOn, AddSlider(tab, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 160, "%d"))
 
 	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_ITEMS", "objects", COL2, y))
-	Gate(ItemsOn, AddSlider(tab, "ICON_SIZE", "objectScale", 0.5, 3.0, 0.05, COL2 + 4, y - 22, "%.2f"))
-	Gate(ItemsOn, AddSlider(tab, "POS_X", "objectOffsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 62, "%d"))
-	Gate(ItemsOn, AddSlider(tab, "POS_Y", "objectOffset", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 102, "%d"))
+	AnchorMenu("objectAnchor", "objectOffsetX", "objectOffset", COL2 + 4, y - 26, ItemsOn)
+	Gate(ItemsOn, AddSlider(tab, "ICON_SIZE", "objectScale", 0.5, 3.0, 0.05, COL2 + 4, y - 80, "%.2f"))
+	Gate(ItemsOn, AddSlider(tab, "POS_X", "objectOffsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 120, "%d"))
+	Gate(ItemsOn, AddSlider(tab, "POS_Y", "objectOffset", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 160, "%d"))
 end
 
 -- The objective count ("8/12") next to quest mobs: everything about it is its own.
@@ -1900,7 +1941,7 @@ end
 -- places its controls from (LEFT, TOP) as on a full panel, so a section frame is shifted to put
 -- TOP right under its heading.
 local SETTINGS_SECTIONS = {
-	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 200 },
+	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 258 },
 	{ key = "TAB_ICON", build = BuildIconTab, height = 184 },
 	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 404 },
 	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 152 },
@@ -2136,26 +2177,50 @@ local plateMeasured = false
 -- The game shrinks far plates and enlarges the target's (it scales the plate or its UnitFrame),
 -- and a plate is often first seen far away: those scales are taken out, so the saved size is
 -- the plate at its normal, close-range scale. force = measure again (for /cqi plate).
+-- Nameplates are restricted regions: some clients refuse to measure them (GetTop and friends
+-- raise "Can't measure restricted regions"), so every read is protected.
+local function Read(obj, method)
+	if not (obj and obj[method]) then return end
+	local ok, a, b = pcall(obj[method], obj)
+	if ok then return a, b end
+end
+
+-- How far below the top of its plate (or UnitFrame) the bar is anchored, from its anchor points.
+local function BarOffsetFromAnchors(bar, plate, frame)
+	local ok, count = pcall(bar.GetNumPoints, bar)
+	if not ok or type(count) ~= "number" then return end
+	for i = 1, count do
+		local ok2, _, rel, relPoint, _, y = pcall(bar.GetPoint, bar, i)
+		if ok2 and (rel == plate or rel == frame) and type(relPoint) == "string" and relPoint:find("TOP") and type(y) == "number" then
+			return -y
+		end
+	end
+end
+
 local function MeasurePlate(unit, force)
 	if (plateMeasured and not force) or not (root and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
 	local plate = C_NamePlate.GetNamePlateForUnit(unit)
 	if not plate then return end
-	local w, h = plate:GetSize()
-	local eff = plate:GetEffectiveScale()
+	local w, h = Read(plate, "GetSize")
+	local eff = Read(plate, "GetEffectiveScale")
 	if not (w and h and eff) or w <= 0 or h <= 0 then return end
-	local plateScale = (plate.GetScale and plate:GetScale()) or 1
+	local plateScale = Read(plate, "GetScale") or 1
 	local frame = plate.UnitFrame
-	local frameScale = (frame and frame.GetScale and frame:GetScale()) or 1
+	local frameScale = Read(frame, "GetScale") or 1
 	local geom = { w = w, h = h, eff = eff / plateScale, plateScale = plateScale, frameScale = frameScale }
 	local bar = frame and (frame.healthBar or frame.HealthBar
 		or (frame.HealthBarsContainer and frame.HealthBarsContainer.healthBar))
-	local plateTop, barTop = plate:GetTop(), bar and bar.GetTop and bar:GetTop()
-	if bar and plateTop and barTop then
-		local bw, bh = bar:GetSize()
-		local barEff = bar:GetEffectiveScale()
+	local bw, bh = Read(bar, "GetSize")
+	local barEff = Read(bar, "GetEffectiveScale")
+	if bw and bh and barEff then
 		local unitScale = eff * frameScale -- screen pixels per base plate unit, inside the UnitFrame
 		geom.barW, geom.barH = bw * barEff / unitScale, bh * barEff / unitScale
-		geom.barTop = (plateTop * eff - barTop * barEff) / unitScale
+		local plateTop, barTop = Read(plate, "GetTop"), Read(bar, "GetTop")
+		if plateTop and barTop then
+			geom.barTop = (plateTop * eff - barTop * barEff) / unitScale
+		else
+			geom.barTop = BarOffsetFromAnchors(bar, plate, frame) -- positions are restricted here
+		end
 	end
 	root.plateGeom = geom
 	plateMeasured = true
@@ -2253,14 +2318,21 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 		print("|cffffd200" .. TITLE .. "|r " .. (db.active and L.ON or L.OFF))
 	elseif cmd == "plate" then
 		-- Measures the target's nameplate for the preview and prints what was found.
-		local geom = UnitExists("target") and MeasurePlate("target", true)
+		-- Protected: an error here would leave the text stuck in the chat box.
+		local ok, geom = pcall(function() return UnitExists("target") and MeasurePlate("target", true) end)
+		if not ok then
+			print("|cffffd200" .. TITLE .. "|r plate error: " .. tostring(geom))
+			return
+		end
 		if not geom then
 			print("|cffffd200" .. TITLE .. "|r target an enemy with a visible nameplate, then /cqi plate")
 			return
 		end
+		local function n(v) return tonumber(v) or 0 end
 		print(string.format("|cffffd200%s|r plate %.0fx%.0f, base scale %.2f (plate x%.2f, frame x%.2f), bar %s",
-			TITLE, geom.w, geom.h, geom.eff, geom.plateScale, geom.frameScale,
-			geom.barW and string.format("%.0fx%.0f at %.0f from the top", geom.barW, geom.barH, geom.barTop) or "not found"))
+			TITLE, n(geom.w), n(geom.h), n(geom.eff), n(geom.plateScale), n(geom.frameScale),
+			geom.barW and string.format("%.0fx%.0f at %s from the top", n(geom.barW), n(geom.barH),
+				geom.barTop and string.format("%.0f", geom.barTop) or "?") or "not found"))
 	else
 		OpenPanel()
 	end

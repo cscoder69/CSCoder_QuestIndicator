@@ -789,3 +789,16 @@ local badgeLook = {
 for code, keys in pairs(badgeLook) do
 	for k, v in pairs(keys) do locales[code][k] = v end
 end
+
+-- Icon anchor: which side of the nameplate the icon sits on.
+local anchorText = {
+	enUS = { ICON_ANCHOR = "Anchor", ANCHOR_top = "Top", ANCHOR_bottom = "Bottom", ANCHOR_left = "Left", ANCHOR_right = "Right" },
+	ptBR = { ICON_ANCHOR = "Âncora", ANCHOR_top = "Em cima", ANCHOR_bottom = "Embaixo", ANCHOR_left = "À esquerda", ANCHOR_right = "À direita" },
+	esES = { ICON_ANCHOR = "Anclaje", ANCHOR_top = "Arriba", ANCHOR_bottom = "Abajo", ANCHOR_left = "Izquierda", ANCHOR_right = "Derecha" },
+	deDE = { ICON_ANCHOR = "Ankerpunkt", ANCHOR_top = "Oben", ANCHOR_bottom = "Unten", ANCHOR_left = "Links", ANCHOR_right = "Rechts" },
+	frFR = { ICON_ANCHOR = "Ancrage", ANCHOR_top = "En haut", ANCHOR_bottom = "En bas", ANCHOR_left = "À gauche", ANCHOR_right = "À droite" },
+	itIT = { ICON_ANCHOR = "Ancoraggio", ANCHOR_top = "Sopra", ANCHOR_bottom = "Sotto", ANCHOR_left = "A sinistra", ANCHOR_right = "A destra" },
+}
+for code, keys in pairs(anchorText) do
+	for k, v in pairs(keys) do locales[code][k] = v end
+end
