@@ -31,6 +31,7 @@ local DEFAULTS = {
 	progressColor = "white",   -- "white", "gold", "green", "kind" (same colour as the icon) or "progress" (red to green)
 	progressFormat = "slash",  -- "slash" 8/12, "spaced" 8 / 12, "both" 8/12 (67%), "percent" 67%, "left" 4 left
 	progressShadow = false,   -- drop shadow behind the text
+	progressBadge = true,     -- the text sits in a badge (dark pill, gold border) -- experiment
 	progressX = 36,      -- its X
 	progressY = 0,       -- its Y
 	bounce = true,       -- floating up/down animation
@@ -97,6 +98,9 @@ local KIND_TINT = { daily = { 0.55, 0.8, 1 }, group = { 1, 0.5, 0.45 } }
 local TEXT_FONTS = { friz = "Fonts\\FRIZQT__.TTF", arial = "Fonts\\ARIALN.TTF", skurri = "Fonts\\skurri.ttf", morpheus = "Fonts\\MORPHEUS.TTF" }
 local TEXT_FONT_ORDER = { "friz", "arial", "skurri", "morpheus" }
 local PROGRESS_FORMATS = { "slash", "spaced", "both", "percent", "left" }
+local BADGE_BACKDROP = { bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	tile = true, tileSize = 16, edgeSize = 10, insets = { left = 2, right = 2, top = 2, bottom = 2 } }
+local BADGE_PAD_X, BADGE_PAD_Y = 8, 5
 
 local TEXT_OUTLINES = { none = "", thin = "OUTLINE", thick = "THICKOUTLINE" }
 local TEXT_COLORS = { white = { 1, 1, 1 }, gold = { 1, 0.82, 0 }, green = { 0.3, 1, 0.3 } }
@@ -348,7 +352,8 @@ local function PlaceText(f, wave)
 	text:ClearAllPoints()
 	label:ClearAllPoints()
 	if db.progressAttach then
-		label:SetPoint("LEFT")
+		-- In a badge the text is centred in the pill; plain, it starts right at the icon.
+		label:SetPoint(db.progressBadge and "CENTER" or "LEFT")
 		text:SetPoint("LEFT", f, "RIGHT", ATTACH_GAP, lift)
 	else
 		label:SetPoint("CENTER")
@@ -402,6 +407,16 @@ local function StyleIcon(f)
 		color = color or TEXT_COLORS.white
 		label:SetTextColor(color[1], color[2], color[3])
 		label:SetText(shown)
+		-- Badge: a dark pill sized to the text, with a gold border.
+		if db.progressBadge and text.SetBackdrop then
+			text:SetBackdrop(BADGE_BACKDROP)
+			text:SetBackdropColor(0.05, 0.04, 0.02, 0.85)
+			text:SetBackdropBorderColor(1, 0.82, 0, 0.9)
+			text:SetSize((label:GetStringWidth() or 30) + BADGE_PAD_X * 2, (label:GetStringHeight() or 12) + BADGE_PAD_Y * 2)
+		else
+			if text.SetBackdrop then text:SetBackdrop(nil) end
+			text:SetSize(60, 20)
+		end
 		text:SetScale(1 / scale)
 		PlaceText(f, 0)
 	end
@@ -452,7 +467,8 @@ local function CreateIcon()
 	icon:SetAllPoints()
 	f.icon = icon
 
-	local text = CreateFrame("Frame", nil, f)
+	-- Backdrop template so the progress text can sit in a badge (dark pill, gold border).
+	local text = CreateFrame("Frame", nil, f, BackdropTemplateMixin and "BackdropTemplate" or nil)
 	text:SetSize(60, 20)
 	text.label = text:CreateFontString(nil, "OVERLAY")
 	text.label:SetPoint("CENTER")
@@ -1491,7 +1507,7 @@ local PREVIEW_WIDTH, PREVIEW_HEIGHT = 240, 340 -- the preview window
 local DISPLAY_KEYS = { "active", "enabled", "objects", "scale", "offsetX", "offset", "objectScale", "objectOffsetX", "objectOffset" }
 local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "glowAlpha" }
 local PROGRESS_KEYS = { "progress", "progressAttach", "progressFloat", "progressSize", "progressFont",
-	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressX", "progressY" }
+	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressBadge", "progressX", "progressY" }
 local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice" }
 
 local function ResetKeys(keys)
@@ -1576,12 +1592,13 @@ local function BuildProgressTab(tab)
 	Gate(ProgressOn, AddDropdown(tab, "TEXT_COLOR", { "white", "gold", "green", "kind", "progress" },
 		function(value) return L["COLOR_" .. value] end, Choice("progressColor"), SetChoice("progressColor"),
 		COL2 + 4, TOP - 162, COLUMN_DROPDOWN))
-	GateCheck(ProgressOn, AddCheck(tab, "TEXT_SHADOW", "TEXT_SHADOW_TIP", "progressShadow", COL1, TOP - 196))
+	GateCheck(ProgressOn, AddCheck(tab, "TEXT_SHADOW", "TEXT_SHADOW_TIP", "progressShadow", COL1, TOP - 214))
+	GateCheck(ProgressOn, AddCheck(tab, "PROGRESS_BADGE", "PROGRESS_BADGE_TIP", "progressBadge", COL2, TOP - 214))
 
 	-- Attached, the text is glued to the icon: X/Y only apply when it stands on its own.
 	local function FreeTextOn() return ProgressOn() and not db.progressAttach end
-	Gate(FreeTextOn, AddSlider(tab, "POS_X", "progressX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, TOP - 252, "%d"))
-	Gate(FreeTextOn, AddSlider(tab, "POS_Y", "progressY", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, TOP - 252, "%d"))
+	Gate(FreeTextOn, AddSlider(tab, "POS_X", "progressX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, TOP - 270, "%d"))
+	Gate(FreeTextOn, AddSlider(tab, "POS_Y", "progressY", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, TOP - 270, "%d"))
 end
 
 local function BuildIconTab(tab)
@@ -1743,7 +1760,7 @@ end
 local SETTINGS_SECTIONS = {
 	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 200 },
 	{ key = "TAB_ICON", build = BuildIconTab, height = 184 },
-	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 292 },
+	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 310 },
 	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 152 },
 }
 local SECTION_GAP = 18
