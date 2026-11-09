@@ -3,6 +3,7 @@
 ## Notes: Floating, animated quest icon over mobs and objects you still need for an active quest.
 ## Author: CS.Coder
 ## Version: @project-version@
+## X-Curse-Project-ID: 1793185
 ## SavedVariables: CSCoderQuestIndicatorDB
 
 CSCoder_QuestIndicator.lua
