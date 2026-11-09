@@ -2,7 +2,7 @@
 ## Title: CS.Coder - Quest Indicator
 ## Notes: Floating, animated quest icon over mobs and objects you still need for an active quest.
 ## Author: CS.Coder
-## Version: 1.0.0
+## Version: @project-version@
 ## SavedVariables: CSCoderQuestIndicatorDB
 
 CSCoder_QuestIndicator.lua
