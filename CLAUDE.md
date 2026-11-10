@@ -137,7 +137,7 @@ live in game after `/reload`.
   game closed meanwhile). At 100% it plays on Master.
 - **Hide in instanced content** (`hideInInstances`, on by default; the user's tester got errors in
   dungeons). `UsablePlate(unit)` never returns forbidden plates; plates are measured outside instances only.
-- **Bug reports (v1.2.3):** `/cqi debug` (`ShowDebug`: versions, client, language, main switches,
+- **Bug reports (v1.2.3, branch `feature/v1.2.3`, NOT released: the user tests it next day, 2026-11-10):** `/cqi debug` (`ShowDebug`: versions, client, language, main switches,
   instance, plate cvars, other quest/nameplate addons, last errors) and a "Report a bug" button
   (issues URL), both in the copy window (`OpenShareWindow("copy", title, hint, text)`). Errors that
   mention the addon are kept in `root.lastErrors` (last 10) by a wrapper around the current error
