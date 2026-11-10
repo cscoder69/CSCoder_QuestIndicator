@@ -2230,6 +2230,8 @@ do
 end
 
 local function BuildProfilesTab(tab)
+	-- This tab is laid out from the panel's top; the box starts lower in the options window.
+	local TOP = TOP - 36
 	local function Desc(key, y)
 		local fs = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 		fs:SetPoint("TOPLEFT", LEFT, y)
