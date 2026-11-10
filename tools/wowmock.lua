@@ -199,7 +199,7 @@ local db = env.CSCoderQuestIndicatorDB
 local names = {}
 for name in pairs(db.profiles) do names[#names + 1] = name end
 print("profiles:", table.concat(names, ", "), "| char ->", db.chars["Tester - Realm"], "| language:", db.language)
-local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1 }
+local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1, CreateColor = 1, SettingsPanel = 1, InterfaceOptionsFrame = 1, HideUIPanel = 1 }
 local unexpected = {}
 for k in pairs(missing) do if not known[k] then unexpected[#unexpected + 1] = k end end
 print("unexpected nil globals:", #unexpected == 0 and "none" or table.concat(unexpected, ", "))

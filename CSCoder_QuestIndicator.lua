@@ -994,6 +994,194 @@ local function GetCSCoderParent()
 	return parent
 end
 
+---------------------------------------------------------------------------------------------
+-- Skin: the look of every window and control, drawn with flat colour textures (no art files
+-- except one smooth circle). Inspired by OneForAll: dark warm panels, a thin gold ring, gold
+-- text, switches instead of check boxes, gold-filled sliders. Hover is drawn on the HIGHLIGHT
+-- layer, so it can never get stuck.
+---------------------------------------------------------------------------------------------
+
+local Skin = {}
+do
+	local CIRCLE = "Interface\\AddOns\\" .. ADDON .. "\\icons\\ui\\circle"
+	Skin.CIRCLE = CIRCLE
+	Skin.GOLD = { 1, 0.82, 0.2 }
+	Skin.RING = { 0.50, 0.42, 0.30, 0.85 }
+
+	-- Four 1-pixel lines around a frame.
+	function Skin.Edges(f, r, g, b, a, layer)
+		local edges = {}
+		for i, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+			local e = f:CreateTexture(nil, layer or "BORDER")
+			e:SetColorTexture(r, g, b, a or 1)
+			if side == "TOP" or side == "BOTTOM" then
+				e:SetPoint(side .. "LEFT")
+				e:SetPoint(side .. "RIGHT")
+				e:SetHeight(1)
+			else
+				e:SetPoint("TOP" .. side)
+				e:SetPoint("BOTTOM" .. side)
+				e:SetWidth(1)
+			end
+			edges[i] = e
+		end
+		return edges
+	end
+
+	function Skin.Recolor(f, fill, ring)
+		if fill and f.skinBg then f.skinBg:SetColorTexture(fill[1], fill[2], fill[3], fill[4] or 1) end
+		if ring and f.skinEdges then
+			for _, e in ipairs(f.skinEdges) do e:SetColorTexture(ring[1], ring[2], ring[3], ring[4] or 1) end
+		end
+	end
+
+	-- A flat panel: fill and a thin ring.
+	function Skin.Panel(f, fill, ring)
+		fill, ring = fill or { 0.045, 0.045, 0.055, 0.96 }, ring or Skin.RING
+		f.skinBg = f:CreateTexture(nil, "BACKGROUND")
+		f.skinBg:SetAllPoints()
+		f.skinBg:SetColorTexture(fill[1], fill[2], fill[3], fill[4] or 1)
+		f.skinEdges = Skin.Edges(f, ring[1], ring[2], ring[3], ring[4])
+		return f
+	end
+
+	-- A window: warm dark fill, gold ring with a faint inner glow, and a header band that
+	-- fades into the background (bandHeight 0 = none).
+	function Skin.Window(f, bandHeight)
+		Skin.Panel(f, { 0.065, 0.058, 0.048, 0.97 }, { 0.50, 0.38, 0.19, 1 })
+		local glow = CreateFrame("Frame", nil, f)
+		glow:SetPoint("TOPLEFT", 1, -1)
+		glow:SetPoint("BOTTOMRIGHT", -1, 1)
+		Skin.Edges(glow, 0.95, 0.72, 0.32, 0.12)
+		bandHeight = bandHeight or 40
+		if bandHeight > 0 then
+			local band = f:CreateTexture(nil, "BORDER")
+			band:SetPoint("TOPLEFT", 1, -1)
+			band:SetPoint("TOPRIGHT", -1, -1)
+			band:SetHeight(bandHeight)
+			band:SetColorTexture(1, 1, 1, 1)
+			local ok = band.SetGradient and CreateColor and pcall(band.SetGradient, band, "VERTICAL",
+				CreateColor(0.065, 0.058, 0.048, 0), CreateColor(0.22, 0.15, 0.07, 0.9))
+			if not ok then
+				ok = band.SetGradientAlpha and pcall(band.SetGradientAlpha, band, "VERTICAL", 0.065, 0.058, 0.048, 0, 0.22, 0.15, 0.07, 0.9)
+			end
+			if not ok then band:SetColorTexture(0.14, 0.10, 0.06, 0.8) end
+			local line = f:CreateTexture(nil, "BORDER")
+			line:SetPoint("TOPLEFT", 1, -bandHeight)
+			line:SetPoint("TOPRIGHT", -1, -bandHeight)
+			line:SetHeight(1)
+			line:SetColorTexture(0.50, 0.38, 0.19, 0.7)
+		end
+		return f
+	end
+
+	-- A gold button: dark plate, warm inner tint, gold edges, gold label that sinks 1 px when
+	-- pressed. Size it after; SetText works as on Blizzard buttons.
+	function Skin.Button(parent)
+		local b = CreateFrame("Button", nil, parent)
+		b:SetSize(120, 24)
+		Skin.Panel(b, { 0.075, 0.065, 0.050, 1 }, { 0.72, 0.50, 0.16, 0.72 })
+		local inner = b:CreateTexture(nil, "BORDER")
+		inner:SetPoint("TOPLEFT", 1, -1)
+		inner:SetPoint("BOTTOMRIGHT", -1, 1)
+		inner:SetColorTexture(0.30, 0.22, 0.10, 0.28)
+		local hover = b:CreateTexture(nil, "HIGHLIGHT")
+		hover:SetAllPoints()
+		hover:SetColorTexture(0.78, 0.55, 0.18, 0.18)
+		local label = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		label:SetPoint("CENTER")
+		label:SetTextColor(0.95, 0.82, 0.50)
+		b:SetFontString(label)
+		b:SetPushedTextOffset(1, -1)
+		b:SetScript("OnDisable", function() label:SetTextColor(0.5, 0.5, 0.5) end)
+		b:SetScript("OnEnable", function() label:SetTextColor(0.95, 0.82, 0.50) end)
+		return b
+	end
+
+	-- A small square close button with a gold X; it hides its parent unless told otherwise.
+	function Skin.Close(parent)
+		local b = Skin.Button(parent)
+		b:SetSize(24, 22)
+		b:SetText("X")
+		b:SetScript("OnClick", function() parent:Hide() end)
+		return b
+	end
+
+	-- A check box drawn as a switch: a pill track and a round knob that slides right when on.
+	function Skin.Switch(check)
+		for _, getter in ipairs({ "GetNormalTexture", "GetPushedTexture", "GetHighlightTexture", "GetCheckedTexture", "GetDisabledCheckedTexture", "GetDisabledTexture" }) do
+			local t = check[getter] and check[getter](check)
+			if t and t.SetAlpha then t:SetAlpha(0) end
+		end
+		check:SetSize(34, 18)
+		local parts = {}
+		local function Part(layer, l, r)
+			local t = check:CreateTexture(nil, layer)
+			t:SetTexture(CIRCLE)
+			t:SetTexCoord(l, r, 0, 1)
+			parts[#parts + 1] = t
+			return t
+		end
+		local left, middle, right = Part("ARTWORK", 0, 0.5), Part("ARTWORK", 0.49, 0.51), Part("ARTWORK", 0.5, 1)
+		left:SetSize(9, 18)
+		left:SetPoint("LEFT")
+		right:SetSize(9, 18)
+		right:SetPoint("RIGHT")
+		middle:SetPoint("TOPLEFT", left, "TOPRIGHT")
+		middle:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT")
+		local knob = check:CreateTexture(nil, "OVERLAY")
+		knob:SetTexture(CIRCLE)
+		knob:SetSize(14, 14)
+		local hover = check:CreateTexture(nil, "HIGHLIGHT")
+		hover:SetTexture(CIRCLE)
+		hover:SetSize(20, 20)
+		hover:SetVertexColor(1, 0.85, 0.4, 0.25)
+		hover:SetPoint("CENTER", knob, "CENTER")
+		local function Paint()
+			local on = check:GetChecked() and true or false
+			local track = on and { 0.62, 0.49, 0.27 } or { 0.23, 0.23, 0.25 }
+			for _, t in ipairs(parts) do t:SetVertexColor(track[1], track[2], track[3]) end
+			if on then knob:SetVertexColor(0.90, 0.87, 0.80) else knob:SetVertexColor(0.55, 0.56, 0.58) end
+			knob:ClearAllPoints()
+			knob:SetPoint(on and "RIGHT" or "LEFT", check, on and "RIGHT" or "LEFT", on and -2 or 2, 0)
+		end
+		local setChecked = check.SetChecked
+		check.SetChecked = function(self, value)
+			setChecked(self, value)
+			Paint()
+		end
+		check:HookScript("OnClick", Paint)
+		Paint()
+		return check
+	end
+
+	-- A slider drawn flat: dark 6-px track with a ring, a gold fill up to the thumb, a round
+	-- light thumb. Paint(value) after every change keeps the fill in step.
+	function Skin.Slider(slider, low, high, width)
+		local track = CreateFrame("Frame", nil, slider)
+		track:SetPoint("LEFT", 0, 0)
+		track:SetPoint("RIGHT", 0, 0)
+		track:SetHeight(6)
+		track:SetFrameLevel(math.max(0, slider:GetFrameLevel() - 1))
+		Skin.Panel(track, { 0.04, 0.04, 0.05, 1 }, { 0.55, 0.42, 0.20, 0.9 })
+		local fill = track:CreateTexture(nil, "ARTWORK")
+		fill:SetPoint("TOPLEFT", 1, -1)
+		fill:SetPoint("BOTTOMLEFT", 1, 1)
+		fill:SetColorTexture(0.85, 0.64, 0.24, 0.75)
+		slider:SetThumbTexture(CIRCLE)
+		local thumb = slider:GetThumbTexture()
+		if thumb then
+			thumb:SetSize(14, 14)
+			thumb:SetVertexColor(0.95, 0.85, 0.62)
+		end
+		function slider.Paint(value)
+			local share = (high > low) and math.max(0, math.min(1, ((value or low) - low) / (high - low))) or 0
+			fill:SetWidth(math.max(1, share * ((width or 200) - 2)))
+		end
+		return slider
+	end
+end
+
 local function AddHeading(parent, key, x, y)
 	local fs = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	fs:SetPoint("TOPLEFT", x, y)
@@ -1002,15 +1190,17 @@ end
 
 local function AddCheck(parent, labelKey, tipKey, settingKey, x, y)
 	local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-	check:SetPoint("TOPLEFT", x, y)
-	local text = check.Text or check.text
-	if not text then
-		text = check:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-		text:SetPoint("LEFT", check, "RIGHT", 4, 0)
-	end
+	check:SetPoint("TOPLEFT", x + 4, y - 6)
+	Skin.Switch(check)
+	-- Our own label right of the switch (the template's would sit over it).
+	if check.Text then check.Text:SetText("") end
+	if check.text then check.text:SetText("") end
+	local text = check:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	text:SetPoint("LEFT", check, "RIGHT", 8, 0)
+	check:SetHitRectInsets(0, -200, -4, -4) -- the label is clickable too
 	Loc(text, labelKey)
 	local note = parent:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	note:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 30, 4)
+	note:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 42, -2)
 	note:SetWidth(250)
 	note:SetJustifyH("LEFT")
 	if tipKey then Loc(note, tipKey) end
@@ -1062,10 +1252,7 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 	slider:SetMinMaxValues(low, high)
 	slider:SetValueStep(step)
 	slider:SetObeyStepOnDrag(true)
-	if slider.SetBackdrop then
-		slider:SetBackdrop({ bgFile = "Interface\\Buttons\\UI-SliderBar-Background", edgeFile = "Interface\\Buttons\\UI-SliderBar-Border", tile = true, tileSize = 8, edgeSize = 8, insets = { left = 3, right = 3, top = 6, bottom = 6 } })
-	end
-	slider:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+	Skin.Slider(slider, low, high, SLIDER_WIDTH)
 	-- A small box next to the slider shows the value; type a number and press Enter to set it,
 	-- Escape (or clicking away) puts the current value back.
 	local input = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
@@ -1084,6 +1271,7 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 	local function UpdateLabel(value)
 		title:SetText(L[labelKey])
 		ShowValue(value)
+		slider.Paint(value)
 	end
 	local syncing = false
 	-- Typed values keep up to 2 decimals, finer than the slider's step; the slider just follows.
@@ -1096,6 +1284,7 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 				syncing = true
 				slider:SetValue(typed)
 				syncing = false
+				slider.Paint(typed)
 				ApplySettings()
 			end
 		end
@@ -1180,32 +1369,26 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, 
 	local button = CreateFrame("Button", nil, parent, backdrop)
 	button:SetSize(width, 24)
 	button:SetPoint("TOPLEFT", x, y - 18)
-	if button.SetBackdrop then
-		button:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-		button:SetBackdropColor(0, 0, 0, 0.6)
-		button:SetBackdropBorderColor(0.5, 0.5, 0.5)
-	end
+	Skin.Panel(button, { 0.075, 0.065, 0.050, 0.95 }, Skin.RING)
 	local value = button:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	value:SetPoint("LEFT", 10, 0)
 	value:SetPoint("RIGHT", -26, 0)
 	value:SetJustifyH("LEFT")
 	local arrow = button:CreateTexture(nil, "ARTWORK")
-	arrow:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
-	arrow:SetSize(22, 22)
-	arrow:SetPoint("RIGHT", -2, 0)
-	button:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
-	button:GetHighlightTexture():SetAlpha(0.2)
+	arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+	arrow:SetSize(12, 12)
+	arrow:SetPoint("RIGHT", -8, -3)
+	arrow:SetVertexColor(0.95, 0.82, 0.50)
+	local buttonHover = button:CreateTexture(nil, "HIGHLIGHT")
+	buttonHover:SetAllPoints()
+	buttonHover:SetColorTexture(0.78, 0.55, 0.18, 0.14)
 
 	-- The list lives on the panel, not under the button: inside the scrolling page it would be
 	-- cut off at the bottom of the view.
 	local list = CreateFrame("Frame", nil, dropdownHost or panel, backdrop)
 	list:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, 2)
 	list:SetFrameStrata("FULLSCREEN_DIALOG")
-	if list.SetBackdrop then
-		list:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-		list:SetBackdropColor(0.05, 0.05, 0.05, 0.97)
-		list:SetBackdropBorderColor(0.6, 0.6, 0.6)
-	end
+	Skin.Panel(list, { 0.045, 0.045, 0.055, 0.98 }, Skin.RING)
 	list:Hide()
 
 	-- options can be a function (lists that change, like profiles): rows are made as needed.
@@ -1223,7 +1406,9 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, 
 		row.text:SetPoint("LEFT", 22, 0)
 		row.text:SetPoint("RIGHT", -4, 0)
 		row.text:SetJustifyH("LEFT")
-		row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		local rowHover = row:CreateTexture(nil, "HIGHLIGHT")
+		rowHover:SetAllPoints()
+		rowHover:SetColorTexture(0.90, 0.66, 0.22, 0.18)
 		-- preview(option), when given, adds a play button to each row (the sound menu).
 		if preview then
 			row.text:SetPoint("RIGHT", -22, 0)
@@ -1265,6 +1450,7 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, 
 			row.text:SetText(labelFor(option))
 			UseFont(row.text, option)
 			row.check:SetShown(option == current)
+			if option == current then row.text:SetTextColor(1, 0.82, 0.2) else row.text:SetTextColor(0.92, 0.90, 0.84) end
 			row:Show()
 		end
 		for i = #items + 1, #rows do rows[i]:Hide() end
@@ -1316,14 +1502,12 @@ local function BuildIconPicker()
 	f:RegisterForDrag("LeftButton")
 	f:SetScript("OnDragStart", f.StartMoving)
 	f:SetScript("OnDragStop", f.StopMovingOrSizing)
-	if f.SetBackdrop then
-		f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
-	end
+	Skin.Window(f, 40)
 	if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, f:GetName()) end -- Esc closes it
 	local title = f:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	title:SetPoint("TOPLEFT", 20, -18)
 	Loc(title, "ICON_STYLE")
-	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+	local close = Skin.Close(f)
 	close:SetPoint("TOPRIGHT", -4, -4)
 	f:Hide()
 
@@ -1336,9 +1520,7 @@ local function BuildIconPicker()
 		local b = CreateFrame("Button", nil, f, backdrop)
 		b:SetSize(190, 44)
 		b:SetPoint("TOPLEFT", 18, -48 - (i - 1) * 54)
-		if b.SetBackdrop then
-			b:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-		end
+		Skin.Panel(b)
 		local label = b:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 		label:SetPoint("LEFT", 12, 0)
 		label:SetPoint("RIGHT", -46, 0)
@@ -1348,8 +1530,9 @@ local function BuildIconPicker()
 		sample:SetSize(34, 34)
 		sample:SetPoint("RIGHT", -6, 0)
 		sample:SetTexture(IconPath(category.sample))
-		b:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
-		b:GetHighlightTexture():SetAlpha(0.25)
+		local hover = b:CreateTexture(nil, "HIGHLIGHT")
+		hover:SetAllPoints()
+		hover:SetColorTexture(0.90, 0.66, 0.22, 0.10)
 		b.categoryKey = category.key
 		b:SetScript("OnClick", function() shownCategory = category.key; f:Refresh() end)
 		categoryButtons[i] = b
@@ -1392,13 +1575,9 @@ local function BuildIconPicker()
 		local current = CategoryOf(db[f.key])
 		for _, b in ipairs(categoryButtons) do
 			local isShown = b.categoryKey == shownCategory
-			if b.SetBackdropColor then
-				if isShown then b:SetBackdropColor(0.25, 0.2, 0.05, 0.9) else b:SetBackdropColor(0.05, 0.05, 0.05, 0.9) end
-				-- Gold border on the shown category; a dimmer one on the category of the chosen icon.
-				if isShown then b:SetBackdropBorderColor(1, 0.82, 0)
-				elseif b.categoryKey == current then b:SetBackdropBorderColor(0.7, 0.6, 0.3)
-				else b:SetBackdropBorderColor(0.4, 0.4, 0.4) end
-			end
+			-- Gold ring and warm plate on the shown category; a dimmer ring on the chosen icon's.
+			local ring = isShown and { 1, 0.80, 0.40 } or (b.categoryKey == current and { 0.70, 0.55, 0.28 } or { 0.36, 0.28, 0.16 })
+			Skin.Recolor(b, isShown and { 0.21, 0.15, 0.08, 0.95 } or { 0.085, 0.078, 0.066, 0.95 }, ring)
 		end
 		local icons = {}
 		for _, category in ipairs(ICON_CATEGORIES) do
@@ -1425,11 +1604,7 @@ local function AddIconPicker(parent, x, y, key)
 	local b = CreateFrame("Button", nil, parent, backdrop)
 	b:SetSize(260, 48)
 	b:SetPoint("TOPLEFT", x, y)
-	if b.SetBackdrop then
-		b:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 14, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-		b:SetBackdropColor(0, 0, 0, 0.6)
-		b:SetBackdropBorderColor(0.6, 0.5, 0.25)
-	end
+	Skin.Panel(b, { 0.075, 0.065, 0.050, 0.95 }, { 0.72, 0.50, 0.16, 0.72 })
 	local icon = b:CreateTexture(nil, "ARTWORK")
 	icon:SetSize(38, 38)
 	icon:SetPoint("LEFT", 6, 0)
@@ -1445,8 +1620,9 @@ local function AddIconPicker(parent, x, y, key)
 	arrow:SetTexture("Interface\\ChatFrame\\ChatFrameExpandArrow")
 	arrow:SetSize(16, 16)
 	arrow:SetPoint("RIGHT", -10, 0)
-	b:SetHighlightTexture("Interface\\Buttons\\UI-Listbox-Highlight2", "ADD")
-	b:GetHighlightTexture():SetAlpha(0.2)
+	local pickerHover = b:CreateTexture(nil, "HIGHLIGHT")
+	pickerHover:SetAllPoints()
+	pickerHover:SetColorTexture(0.78, 0.55, 0.18, 0.14)
 
 	local function Sync()
 		icon:SetTexture(IconPath(db[key]))
@@ -1483,11 +1659,7 @@ local function BuildPreview(pane, width)
 	local box = CreateFrame("Frame", nil, pane, BackdropTemplateMixin and "BackdropTemplate" or nil)
 	box:SetPoint("TOPLEFT", 0, -20)
 	box:SetPoint("BOTTOMRIGHT")
-	if box.SetBackdrop then
-		box:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 16, insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-		box:SetBackdropColor(0.05, 0.09, 0.05, 0.95)
-		box:SetBackdropBorderColor(0.4, 0.4, 0.4)
-	end
+	Skin.Panel(box, { 0.05, 0.08, 0.05, 0.95 }, Skin.RING)
 	if box.SetClipsChildren then box:SetClipsChildren(true) end
 
 	local divider = box:CreateTexture(nil, "ARTWORK")
@@ -1650,7 +1822,7 @@ local function CreateMinimapButton()
 			RefreshControls()
 			print("|cffffd200" .. TITLE .. "|r " .. (db.active and L.ON or L.OFF))
 		else
-			OpenPanel()
+			OpenPanel(true)
 		end
 	end)
 	b:SetScript("OnDragStart", function(self)
@@ -1700,13 +1872,15 @@ function UpdateMinimapButton()
 	end
 end
 
+local BuildPanel, ShowWizard, ShowNews
+do -- the options window, its sections, the setup guide and what's new (one block: the main
+   -- chunk would pass Lua's 200-locals limit)
 ---------------------------------------------------------------------------------------------
 -- Panel layout: options on the left in four tabs (Display, Icon, Behavior, Profiles), the live
 -- preview fixed on the right.
 ---------------------------------------------------------------------------------------------
 
 local LEFT, TOP = 16, -96
-local OPTIONS_WIDTH = 404 -- the tabbed box on the left
 local PREVIEW_WIDTH, PREVIEW_HEIGHT = 400, 400 -- the preview window: room for a real-size plate with icons on any side
 
 -- Settings each tab owns, for its "Reset this tab" button.
@@ -1732,7 +1906,7 @@ end
 -- Sections share one scrolling page; each has a heading row with its own small reset button.
 local SECTION_HEADER = 34
 local function AddResetTabButton(tab, onReset)
-	local b = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
+	local b = Skin.Button(tab)
 	b:SetSize(130, 20)
 	b:SetPoint("TOPRIGHT", tab, "TOPRIGHT", -16, TOP + SECTION_HEADER - 6)
 	Loc(b, "RESET_SECTION")
@@ -1742,18 +1916,19 @@ local function AddResetTabButton(tab, onReset)
 	end)
 end
 
--- What each control depends on.
-local function AddonOn() return db.active end
-local function MobsOn() return db.active and db.enabled end
-local function ItemsOn() return db.active and db.objects end
-local function AnyIconOn() return db.active and (db.enabled or db.objects) end
-local function ItemLookOn() return ItemsOn() and db.objectOwnLook end
-local function AnyFloat() return db.bounce or (db.objectOwnLook and db.objectBounce) end
-local function AnyGlow() return db.glow or (db.objectOwnLook and db.objectGlow) end
-local function FloatOn() return AnyIconOn() and AnyFloat() end
-local function GlowOn() return AnyIconOn() and AnyGlow() end
+-- What each control depends on (one table: the main chunk is near Lua's 200-locals limit).
+local On = {}
+function On.AddonOn() return db.active end
+function On.MobsOn() return db.active and db.enabled end
+function On.ItemsOn() return db.active and db.objects end
+function On.AnyIconOn() return db.active and (db.enabled or db.objects) end
+function On.ItemLookOn() return On.ItemsOn() and db.objectOwnLook end
+function On.AnyFloat() return db.bounce or (db.objectOwnLook and db.objectBounce) end
+function On.AnyGlow() return db.glow or (db.objectOwnLook and db.objectGlow) end
+function On.FloatOn() return On.AnyIconOn() and On.AnyFloat() end
+function On.GlowOn() return On.AnyIconOn() and On.AnyGlow() end
 -- The text's look applies while either count is on.
-local function ProgressOn() return (MobsOn() and db.progress) or (ItemsOn() and db.objectProgress) end
+function On.ProgressOn() return (On.MobsOn() and db.progress) or (On.ItemsOn() and db.objectProgress) end
 
 local function GateCheck(condition, check)
 	Gate(condition, check, check.labelFS, check.noteFS)
@@ -1784,50 +1959,50 @@ local function BuildDisplayTab(tab)
 	AddCheck(tab, "ENABLE_ADDON", "ENABLE_ADDON_TIP", "active", COL1, TOP)
 
 	local y = TOP - 58
-	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_MOBS", "enabled", COL1, y))
-	AddAnchorMenu(tab, "anchor", "offsetX", "offset", COL1 + 4, y - 26, MobsOn)
-	Gate(MobsOn, AddSlider(tab, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, COL1 + 4, y - 80, "%.2f"))
-	Gate(MobsOn, AddSlider(tab, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 120, "%d"))
-	Gate(MobsOn, AddSlider(tab, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 160, "%d"))
+	GateCheck(On.AddonOn, AddSectionCheck(tab, "QUEST_MOBS", "enabled", COL1, y))
+	AddAnchorMenu(tab, "anchor", "offsetX", "offset", COL1 + 4, y - 26, On.MobsOn)
+	Gate(On.MobsOn, AddSlider(tab, "ICON_SIZE", "scale", 0.5, 3.0, 0.05, COL1 + 4, y - 80, "%.2f"))
+	Gate(On.MobsOn, AddSlider(tab, "POS_X", "offsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 120, "%d"))
+	Gate(On.MobsOn, AddSlider(tab, "POS_Y", "offset", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, y - 160, "%d"))
 
-	GateCheck(AddonOn, AddSectionCheck(tab, "QUEST_ITEMS", "objects", COL2, y))
-	AddAnchorMenu(tab, "objectAnchor", "objectOffsetX", "objectOffset", COL2 + 4, y - 26, ItemsOn)
-	Gate(ItemsOn, AddSlider(tab, "ICON_SIZE", "objectScale", 0.5, 3.0, 0.05, COL2 + 4, y - 80, "%.2f"))
-	Gate(ItemsOn, AddSlider(tab, "POS_X", "objectOffsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 120, "%d"))
-	Gate(ItemsOn, AddSlider(tab, "POS_Y", "objectOffset", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 160, "%d"))
+	GateCheck(On.AddonOn, AddSectionCheck(tab, "QUEST_ITEMS", "objects", COL2, y))
+	AddAnchorMenu(tab, "objectAnchor", "objectOffsetX", "objectOffset", COL2 + 4, y - 26, On.ItemsOn)
+	Gate(On.ItemsOn, AddSlider(tab, "ICON_SIZE", "objectScale", 0.5, 3.0, 0.05, COL2 + 4, y - 80, "%.2f"))
+	Gate(On.ItemsOn, AddSlider(tab, "POS_X", "objectOffsetX", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 120, "%d"))
+	Gate(On.ItemsOn, AddSlider(tab, "POS_Y", "objectOffset", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, y - 160, "%d"))
 end
 
 -- The objective count ("8/12") next to quest mobs: everything about it is its own.
 local function BuildProgressTab(tab)
 	AddResetTabButton(tab, function() ResetKeys(PROGRESS_KEYS) end)
 	-- Left: what it does. Right: how it looks.
-	GateCheck(MobsOn, AddCheck(tab, "PROGRESS", "PROGRESS_TIP", "progress", COL1, TOP))
-	GateCheck(ItemsOn, AddCheck(tab, "PROGRESS_ITEMS", "PROGRESS_ITEMS_TIP", "objectProgress", COL1, TOP - 48))
-	GateCheck(ProgressOn, AddCheck(tab, "PROGRESS_ATTACH", "PROGRESS_ATTACH_TIP", "progressAttach", COL1, TOP - 96))
+	GateCheck(On.MobsOn, AddCheck(tab, "PROGRESS", "PROGRESS_TIP", "progress", COL1, TOP))
+	GateCheck(On.ItemsOn, AddCheck(tab, "PROGRESS_ITEMS", "PROGRESS_ITEMS_TIP", "objectProgress", COL1, TOP - 48))
+	GateCheck(On.ProgressOn, AddCheck(tab, "PROGRESS_ATTACH", "PROGRESS_ATTACH_TIP", "progressAttach", COL1, TOP - 96))
 	-- Floating with the icon needs the icon's own Float.
-	GateCheck(function() return ProgressOn() and AnyFloat() end,
+	GateCheck(function() return On.ProgressOn() and On.AnyFloat() end,
 		AddCheck(tab, "PROGRESS_FLOAT", "PROGRESS_FLOAT_TIP", "progressFloat", COL1, TOP - 144))
-	Gate(ProgressOn, AddSlider(tab, "TEXT_SIZE", "progressSize", 8, 32, 1, COL1 + 4, TOP - 198, "%d"))
+	Gate(On.ProgressOn, AddSlider(tab, "TEXT_SIZE", "progressSize", 8, 32, 1, COL1 + 4, TOP - 198, "%d"))
 
 	local function Choice(key) return function() return db[key] end end
 	local function SetChoice(key) return function(value) db[key] = value; ApplySettings() end end
-	Gate(ProgressOn, AddDropdown(tab, "TEXT_FORMAT", PROGRESS_FORMATS,
+	Gate(On.ProgressOn, AddDropdown(tab, "TEXT_FORMAT", PROGRESS_FORMATS,
 		function(value) return L["FORMAT_" .. value] end, Choice("progressFormat"), SetChoice("progressFormat"),
 		COL2 + 4, TOP, COLUMN_DROPDOWN))
 	-- The font menu also lists fonts shared by other addons, each drawn in its own font.
-	Gate(ProgressOn, AddDropdown(tab, "TEXT_FONT", FontOptions, FontLabel, Choice("progressFont"), SetChoice("progressFont"),
+	Gate(On.ProgressOn, AddDropdown(tab, "TEXT_FONT", FontOptions, FontLabel, Choice("progressFont"), SetChoice("progressFont"),
 		COL2 + 4, TOP - 54, COLUMN_DROPDOWN, FontPath))
-	Gate(ProgressOn, AddDropdown(tab, "TEXT_OUTLINE", { "none", "thin", "thick" },
+	Gate(On.ProgressOn, AddDropdown(tab, "TEXT_OUTLINE", { "none", "thin", "thick" },
 		function(value) return L["OUTLINE_" .. value] end, Choice("progressOutline"), SetChoice("progressOutline"),
 		COL2 + 4, TOP - 108, COLUMN_DROPDOWN))
-	Gate(ProgressOn, AddDropdown(tab, "TEXT_COLOR", { "white", "gold", "green", "kind", "progress" },
+	Gate(On.ProgressOn, AddDropdown(tab, "TEXT_COLOR", { "white", "gold", "green", "kind", "progress" },
 		function(value) return L["COLOR_" .. value] end, Choice("progressColor"), SetChoice("progressColor"),
 		COL2 + 4, TOP - 162, COLUMN_DROPDOWN))
-	GateCheck(ProgressOn, AddCheck(tab, "TEXT_SHADOW", "TEXT_SHADOW_TIP", "progressShadow", COL1, TOP - 244))
-	GateCheck(ProgressOn, AddCheck(tab, "PROGRESS_PULSE", "PROGRESS_PULSE_TIP", "progressPulse", COL2, TOP - 244))
+	GateCheck(On.ProgressOn, AddCheck(tab, "TEXT_SHADOW", "TEXT_SHADOW_TIP", "progressShadow", COL1, TOP - 244))
+	GateCheck(On.ProgressOn, AddCheck(tab, "PROGRESS_PULSE", "PROGRESS_PULSE_TIP", "progressPulse", COL2, TOP - 244))
 
 	-- Attached, the text is glued to the icon: X/Y only apply when it stands on its own.
-	local function FreeTextOn() return ProgressOn() and not db.progressAttach end
+	local function FreeTextOn() return On.ProgressOn() and not db.progressAttach end
 	Gate(FreeTextOn, AddSlider(tab, "POS_X", "progressX", -POSITION_RANGE, POSITION_RANGE, 1, COL1 + 4, TOP - 300, "%d"))
 	Gate(FreeTextOn, AddSlider(tab, "POS_Y", "progressY", -POSITION_RANGE, POSITION_RANGE, 1, COL2 + 4, TOP - 300, "%d"))
 end
@@ -1841,9 +2016,9 @@ local function BuildIconTab(tab)
 }
 	local THEME_ORDER = { "classic", "subtle", "flashy" }
 	AddResetTabButton(tab, function() ResetKeys(ICON_KEYS) end)
-	Gate(AnyIconOn, AddHeading(tab, "ICON_STYLE", COL1, TOP))
-	Gate(AnyIconOn, AddIconPicker(tab, COL1 + 4, TOP - 18))
-	Gate(AnyIconOn, AddDropdown(tab, "QUICK_THEME", THEME_ORDER, function(value) return L["THEME_" .. value] end,
+	Gate(On.AnyIconOn, AddHeading(tab, "ICON_STYLE", COL1, TOP))
+	Gate(On.AnyIconOn, AddIconPicker(tab, COL1 + 4, TOP - 18))
+	Gate(On.AnyIconOn, AddDropdown(tab, "QUICK_THEME", THEME_ORDER, function(value) return L["THEME_" .. value] end,
 		function() return nil end,
 		function(value)
 			for key, v in pairs(THEMES[value]) do db[key] = v end
@@ -1851,24 +2026,24 @@ local function BuildIconTab(tab)
 		end, COL2 + 4, TOP, COLUMN_DROPDOWN))
 
 	local y = TOP - 82
-	GateCheck(AnyIconOn, AddSectionCheck(tab, "FLOAT", "bounce", COL1, y))
-	Gate(FloatOn, AddSlider(tab, "FLOAT_HEIGHT", "bounceHeight", 1, 20, 1, COL1 + 4, y - 22, "%d"))
-	Gate(FloatOn, AddSlider(tab, "FLOAT_TIME", "bounceSpeed", 0.3, 2.0, 0.05, COL1 + 4, y - 62, "%.2f"))
+	GateCheck(On.AnyIconOn, AddSectionCheck(tab, "FLOAT", "bounce", COL1, y))
+	Gate(On.FloatOn, AddSlider(tab, "FLOAT_HEIGHT", "bounceHeight", 1, 20, 1, COL1 + 4, y - 22, "%d"))
+	Gate(On.FloatOn, AddSlider(tab, "FLOAT_TIME", "bounceSpeed", 0.3, 2.0, 0.05, COL1 + 4, y - 62, "%.2f"))
 
-	GateCheck(AnyIconOn, AddSectionCheck(tab, "GLOW_SECTION", "glow", COL2, y))
-	Gate(GlowOn, AddSlider(tab, "GLOW_INTENSITY", "glowAlpha", 0.1, 1.0, 0.05, COL2 + 4, y - 22, "%.2f"))
+	GateCheck(On.AnyIconOn, AddSectionCheck(tab, "GLOW_SECTION", "glow", COL2, y))
+	Gate(On.GlowOn, AddSlider(tab, "GLOW_INTENSITY", "glowAlpha", 0.1, 1.0, 0.05, COL2 + 4, y - 22, "%.2f"))
 
 	-- Quest items can have a look of their own (icon, float, glow); then the above is for mobs.
 	y = y - 112
-	GateCheck(ItemsOn, AddSectionCheck(tab, "ITEM_LOOK", "objectOwnLook", COL1, y))
+	GateCheck(On.ItemsOn, AddSectionCheck(tab, "ITEM_LOOK", "objectOwnLook", COL1, y))
 	local note = tab:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	note:SetPoint("TOPLEFT", COL1 + 26, y - 18)
 	note:SetWidth(560)
 	note:SetJustifyH("LEFT")
-	Gate(ItemsOn, Loc(note, "ITEM_LOOK_TIP"))
-	Gate(ItemLookOn, AddIconPicker(tab, COL1 + 4, y - 50, "objectStyle"))
-	GateCheck(ItemLookOn, AddCheck(tab, "FLOAT", nil, "objectBounce", COL2, y - 48))
-	GateCheck(ItemLookOn, AddCheck(tab, "GLOW_SECTION", nil, "objectGlow", COL2, y - 80))
+	Gate(On.ItemsOn, Loc(note, "ITEM_LOOK_TIP"))
+	Gate(On.ItemLookOn, AddIconPicker(tab, COL1 + 4, y - 50, "objectStyle"))
+	GateCheck(On.ItemLookOn, AddCheck(tab, "FLOAT", nil, "objectBounce", COL2, y - 48))
+	GateCheck(On.ItemLookOn, AddCheck(tab, "GLOW_SECTION", nil, "objectGlow", COL2, y - 80))
 end
 
 local function BuildBehaviorTab(tab)
@@ -1879,10 +2054,10 @@ local function BuildBehaviorTab(tab)
 		Relabel()
 	end)
 	-- Left: how the icons behave. Right: language and sound.
-	GateCheck(AnyIconOn, AddCheck(tab, "COLOR_BY_TYPE", "COLOR_BY_TYPE_TIP", "colorByType", COL1, TOP))
+	GateCheck(On.AnyIconOn, AddCheck(tab, "COLOR_BY_TYPE", "COLOR_BY_TYPE_TIP", "colorByType", COL1, TOP))
 	-- The minimap button stays usable with the addon off: it is how you turn it back on.
 	AddCheck(tab, "MINIMAP", "MINIMAP_TIP", "minimap", COL1, TOP - 48)
-	Gate(AnyIconOn, AddDropdown(tab, "IN_COMBAT", { "show", "fade", "hide" },
+	Gate(On.AnyIconOn, AddDropdown(tab, "IN_COMBAT", { "show", "fade", "hide" },
 		function(value) return L["COMBAT_" .. value:upper()] end,
 		function() return db.combat end,
 		function(value) db.combat = value; UpdateCombatAlpha() end,
@@ -1897,23 +2072,23 @@ local function BuildBehaviorTab(tab)
 		COL2 + 4, TOP, COLUMN_DROPDOWN)
 
 	-- Sound when an objective completes: on/off, which sound, and a button to hear it.
-	local function SoundOn() return AddonOn() and db.sound end
-	GateCheck(AddonOn, AddCheck(tab, "SOUND", "SOUND_TIP", "sound", COL2, TOP - 56))
+	local function SoundOn() return On.AddonOn() and db.sound end
+	GateCheck(On.AddonOn, AddCheck(tab, "SOUND", "SOUND_TIP", "sound", COL2, TOP - 56))
 	Gate(SoundOn, AddDropdown(tab, "SOUND_CHOICE", QUEST_SOUND_ORDER,
 		function(value) return L["SOUND_" .. value] end,
 		function() return db.soundChoice end,
 		function(value) db.soundChoice = value; PlayQuestSound() end,
 		COL2 + 4, TOP - 104, 140, nil,
 		function(value) if PlaySound then pcall(PlaySound, QUEST_SOUNDS[value], "Master") end end))
-	local test = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
+	local test = Skin.Button(tab)
 	test:SetSize(70, 22)
 	test:SetPoint("TOPLEFT", COL2 + 152, TOP - 123)
 	Loc(test, "SOUND_TEST")
 	test:SetScript("OnClick", PlayQuestSound)
 	Gate(SoundOn, test)
 
-	GateCheck(AnyIconOn, AddCheck(tab, "DONE_CHECK", "DONE_CHECK_TIP", "doneCheck", COL1, TOP - 160))
-	GateCheck(AddonOn, AddCheck(tab, "READY_ALERT", "READY_ALERT_TIP", "readyAlert", COL1, TOP - 208))
+	GateCheck(On.AnyIconOn, AddCheck(tab, "DONE_CHECK", "DONE_CHECK_TIP", "doneCheck", COL1, TOP - 160))
+	GateCheck(On.AddonOn, AddCheck(tab, "READY_ALERT", "READY_ALERT_TIP", "readyAlert", COL1, TOP - 208))
 	GateCheck(function() return db.minimap end,
 		AddCheck(tab, "MINIMAP_SUMMARY", "MINIMAP_SUMMARY_TIP", "minimapSummary", COL2, TOP - 160))
 end
@@ -2004,9 +2179,7 @@ do
 		window:RegisterForDrag("LeftButton")
 		window:SetScript("OnDragStart", window.StartMoving)
 		window:SetScript("OnDragStop", window.StopMovingOrSizing)
-		if window.SetBackdrop then
-			window:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
-		end
+		Skin.Window(window, 50)
 		if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, window:GetName()) end
 		title = window:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 		title:SetPoint("TOPLEFT", 24, -22)
@@ -2020,12 +2193,12 @@ do
 		input:SetAutoFocus(false)
 		input:SetMaxLetters(0)
 		input:SetScript("OnEscapePressed", function() window:Hide() end)
-		local close = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
+		local close = Skin.Button(window)
 		close:SetSize(110, 24)
 		close:SetPoint("BOTTOMRIGHT", -24, 20)
 		Loc(close, "SHARE_CLOSE")
 		close:SetScript("OnClick", function() window:Hide() end)
-		action = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
+		action = Skin.Button(window)
 		action:SetSize(130, 24)
 		action:SetPoint("RIGHT", close, "LEFT", -8, 0)
 		Loc(action, "SHARE_IMPORT_BUTTON")
@@ -2070,7 +2243,7 @@ local function BuildProfilesTab(tab)
 	Desc("PROF_INTRO", TOP)
 
 	Desc("PROF_RESET_DESC", TOP - 24)
-	local reset = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
+	local reset = Skin.Button(tab)
 	reset:SetSize(160, 22)
 	reset:SetPoint("TOPLEFT", LEFT, TOP - 42)
 	Loc(reset, "PROF_RESET")
@@ -2112,12 +2285,12 @@ local function BuildProfilesTab(tab)
 	AddDropdown(tab, "PROF_DELETE", OtherProfiles, Name, Nothing, ConfirmDelete, LEFT + 4, TOP - 286, 220)
 
 	Desc("SHARE_DESC", TOP - 346)
-	local export = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
+	local export = Skin.Button(tab)
 	export:SetSize(160, 22)
 	export:SetPoint("TOPLEFT", LEFT, TOP - 366)
 	Loc(export, "SHARE_EXPORT")
 	export:SetScript("OnClick", function() OpenShareWindow("export") end)
-	local import = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
+	local import = Skin.Button(tab)
 	import:SetSize(160, 22)
 	import:SetPoint("LEFT", export, "RIGHT", 8, 0)
 	Loc(import, "SHARE_IMPORT")
@@ -2173,9 +2346,86 @@ local function BuildSettingsTab(tab, box)
 	content:SetHeight(y)
 end
 
-local function BuildPanel()
+local configWindow -- the options window (the panel lives inside it)
+
+local function BuildConfigWindow()
+	local w = CreateFrame("Frame", ADDON .. "Config", UIParent)
+	w:SetSize(780, 680)
+	w:SetFrameStrata("DIALOG")
+	w:SetToplevel(true)
+	w:SetClampedToScreen(true)
+	w:EnableMouse(true)
+	w:SetMovable(true)
+	w:RegisterForDrag("LeftButton")
+	w:SetScript("OnDragStart", w.StartMoving)
+	w:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		local point, _, relativePoint, x, y = self:GetPoint()
+		if x and y then root.windowPos = { point, relativePoint, math.floor(x + 0.5), math.floor(y + 0.5) } end
+	end)
+	Skin.Window(w, 76)
+	if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, w:GetName()) end -- Esc closes it
+	local close = Skin.Close(w)
+	close:SetPoint("TOPRIGHT", -12, -12)
+	w:SetScript("OnShow", function(self)
+		self:ClearAllPoints()
+		local pos = root.windowPos
+		if pos then self:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4]) else self:SetPoint("CENTER") end
+		if PlaySound then pcall(PlaySound, 839) end -- igCharacterInfoOpen
+	end)
+	w:SetScript("OnHide", function() if PlaySound then pcall(PlaySound, 840) end end) -- igCharacterInfoClose
+	w:Hide()
+	panel:SetParent(w)
+	panel:ClearAllPoints()
+	panel:SetAllPoints(w)
+	panel:Show()
+	return w
+end
+
+-- The page under Options > AddOns > CS.Coder > Quest Indicator: a few words and a button that
+-- opens the options window.
+local function BuildSettingsLanding()
+	local page = CreateFrame("Frame")
+	page.name = SUBTITLE
+	local logo = page:CreateTexture(nil, "ARTWORK")
+	logo:SetSize(96, 96)
+	logo:SetPoint("TOPLEFT", 16, -16)
+	logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\icons\\logo")
+	local title = page:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 16, -10)
+	title:SetText(TITLE)
+	local version = page:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	version:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 8, 1)
+	version:SetText(AddonVersion())
+	local text = page:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	text:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+	text:SetWidth(420)
+	text:SetJustifyH("LEFT")
+	Loc(text, "LANDING_TEXT")
+	local open = Skin.Button(page)
+	open:SetSize(200, 28)
+	open:SetPoint("TOPLEFT", logo, "BOTTOMLEFT", 0, -16)
+	Loc(open, "LANDING_OPEN")
+	open:SetScript("OnClick", function() OpenPanel() end)
+	local parent = GetCSCoderParent()
+	if Settings and Settings.RegisterCanvasLayoutSubcategory and parent.category then
+		settingsCategory = Settings.RegisterCanvasLayoutSubcategory(parent.category, page, SUBTITLE)
+	elseif InterfaceOptions_AddCategory then
+		page.parent = parent.name
+		InterfaceOptions_AddCategory(page)
+	end
+end
+
+function BuildPanel()
+	configWindow = BuildConfigWindow()
+	local logo = panel:CreateTexture(nil, "ARTWORK")
+	logo:SetSize(52, 52)
+	logo:SetPoint("TOPLEFT", 14, -12)
+	logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\icons\\logo")
 	local header = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	header:SetPoint("TOPLEFT", 16, -16)
+	header:SetPoint("TOPLEFT", logo, "TOPRIGHT", 10, -8)
+	header:SetFont(header:GetFont(), 20, "")
+	header:SetTextColor(1, 0.93, 0.80)
 	header:SetText(TITLE)
 	-- Version next to the title (the packager fills it in; a dev copy shows "dev").
 	local version = AddonVersion()
@@ -2184,20 +2434,17 @@ local function BuildPanel()
 	versionText:SetText(version)
 	local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	sub:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -6)
-	sub:SetPoint("RIGHT", panel, "RIGHT", -140, 0)
+	sub:SetPoint("RIGHT", panel, "RIGHT", -170, 0)
 	sub:SetJustifyH("LEFT")
+	sub:SetTextColor(0.90, 0.68, 0.30)
 	Loc(sub, "DESC")
 
 	-- Options box over the whole panel, in the Ace3 tab style players know (BlizzMove and many others):
 	-- the game's options-frame tab textures on top of a bordered pane, tabs stretched to fill it.
-	local box = CreateFrame("Frame", nil, panel, BackdropTemplateMixin and "BackdropTemplate" or nil)
-	box:SetPoint("TOPLEFT", 8, -84)
-	box:SetPoint("BOTTOMRIGHT", -8, 8)
-	if box.SetBackdrop then
-		box:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 16, edgeSize = 16, insets = { left = 3, right = 3, top = 5, bottom = 3 } })
-		box:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
-		box:SetBackdropBorderColor(0.4, 0.4, 0.4)
-	end
+	local box = CreateFrame("Frame", nil, panel)
+	box:SetPoint("TOPLEFT", 12, -112)
+	box:SetPoint("BOTTOMRIGHT", -12, 12)
+	Skin.Panel(box, { 0.045, 0.045, 0.055, 0.85 }, Skin.RING)
 
 	-- The preview lives in its own small window (movable, closable), so the options get the whole
 	-- panel. It opens with the options and closes with them; the Preview button toggles it.
@@ -2214,10 +2461,8 @@ local function BuildPanel()
 		local point, _, relativePoint, x, y = self:GetPoint()
 		root.previewPos = { point, relativePoint, x, y }
 	end)
-	if window.SetBackdrop then
-		window:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 24, insets = { left = 6, right = 6, top = 6, bottom = 6 } })
-	end
-	local close = CreateFrame("Button", nil, window, "UIPanelCloseButton")
+	Skin.Window(window, 0)
+	local close = Skin.Close(window)
 	close:SetPoint("TOPRIGHT", -2, -2)
 	close:SetScript("OnClick", function() root.previewHidden = true; window:Hide() end)
 	local pane = CreateFrame("Frame", nil, window)
@@ -2240,9 +2485,9 @@ local function BuildPanel()
 	end)
 	panel:HookScript("OnHide", function() window:Hide() end)
 
-	local toggle = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+	local toggle = Skin.Button(panel)
 	toggle:SetSize(110, 22)
-	toggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -16, -14)
+	toggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -44, -12)
 	Loc(toggle, "PREVIEW")
 	toggle:SetScript("OnClick", function()
 		if window:IsShown() then
@@ -2255,32 +2500,37 @@ local function BuildPanel()
 		end
 	end)
 
-	local TAB_ACTIVE = "Interface\\OptionsFrame\\UI-OptionsFrame-ActiveTab"
-	local TAB_INACTIVE = "Interface\\OptionsFrame\\UI-OptionsFrame-InActiveTab"
-	local function TabPieces(tab, file, point, y)
-		local left = tab:CreateTexture(nil, "BORDER")
-		left:SetTexture(file)
-		left:SetSize(20, 24)
-		left:SetPoint(point, 0, y)
-		left:SetTexCoord(0, 0.15625, 0, 1)
-		local middle = tab:CreateTexture(nil, "BORDER")
-		middle:SetTexture(file)
-		middle:SetHeight(24)
-		middle:SetPoint("LEFT", left, "RIGHT")
-		middle:SetTexCoord(0.15625, 0.84375, 0, 1)
-		local right = tab:CreateTexture(nil, "BORDER")
-		right:SetTexture(file)
-		right:SetSize(20, 24)
-		right:SetPoint("LEFT", middle, "RIGHT")
-		right:SetTexCoord(0.84375, 1, 0, 1)
-		return { left, middle, right }
+	-- Flat tabs: a plate with edges on three sides; the active one is warmer, gold-edged, with
+	-- a gold line on top, and covers the box's top line so it joins the page.
+	local function TabPieces(tab, active)
+		local plate = tab:CreateTexture(nil, "BACKGROUND")
+		plate:SetPoint("TOPLEFT")
+		plate:SetPoint("BOTTOMRIGHT", 0, active and -1 or 0)
+		if active then plate:SetColorTexture(0.21, 0.15, 0.08, 1) else plate:SetColorTexture(0.085, 0.078, 0.066, 1) end
+		local edge = active and { 1, 0.80, 0.40, 0.9 } or { 0.36, 0.28, 0.16, 1 }
+		local pieces = { plate }
+		for _, side in ipairs({ "TOP", "LEFT", "RIGHT" }) do
+			local e = tab:CreateTexture(nil, "BORDER")
+			e:SetColorTexture(edge[1], edge[2], edge[3], edge[4])
+			if side == "TOP" then
+				e:SetPoint("TOPLEFT")
+				e:SetPoint("TOPRIGHT")
+				e:SetHeight(active and 2 or 1)
+			else
+				e:SetPoint("TOP" .. side)
+				e:SetPoint("BOTTOM" .. side)
+				e:SetWidth(1)
+			end
+			pieces[#pieces + 1] = e
+		end
+		return pieces
 	end
 
 	local builders = { BuildSettingsTab, BuildProfilesTab }
 	local keys = { "TAB_SETTINGS", "TAB_PROFILES" }
 	local tabs, frames = {}, {}
 	local selected = 1
-	local TAB_OVERLAP = 10
+	local TAB_GAP = 4
 	local tabWidth = 100 -- until LayoutTabs measures the labels
 
 	local function SelectTab(index)
@@ -2290,34 +2540,34 @@ local function BuildPanel()
 			local isActive = i == index
 			for _, piece in ipairs(tab.active) do piece:SetShown(isActive) end
 			for _, piece in ipairs(tab.inactive) do piece:SetShown(not isActive) end
-			tab.text:SetFontObject(isActive and "GameFontHighlightSmall" or "GameFontNormalSmall")
+			tab.text:SetFontObject("GameFontNormal")
+			if isActive then tab.text:SetTextColor(1, 0.90, 0.62) else tab.text:SetTextColor(0.84, 0.80, 0.72) end
 			tab.text:ClearAllPoints()
-			tab.text:SetPoint("CENTER", tab, "CENTER", 0, isActive and -2 or -3)
+			tab.text:SetPoint("CENTER", tab, "CENTER", 0, 0)
 			if isActive then tab:Disable() else tab:Enable() end
 		end
 	end
 
 	for i, build in ipairs(builders) do
 		local tab = CreateFrame("Button", nil, panel)
-		tab:SetSize(tabWidth, 24)
+		tab:SetSize(tabWidth, 28)
 		tab:SetFrameLevel(box:GetFrameLevel() + 5)
 		if i == 1 then
-			tab:SetPoint("BOTTOMLEFT", box, "TOPLEFT", 4, -4)
+			tab:SetPoint("BOTTOMLEFT", box, "TOPLEFT", 10, 0)
 		else
-			tab:SetPoint("LEFT", tabs[i - 1], "RIGHT", -TAB_OVERLAP, 0)
+			tab:SetPoint("LEFT", tabs[i - 1], "RIGHT", TAB_GAP, 0)
 		end
-		tab.active = TabPieces(tab, TAB_ACTIVE, "BOTTOMLEFT", -3)
-		tab.inactive = TabPieces(tab, TAB_INACTIVE, "TOPLEFT", 0)
-		tab.active[2]:SetWidth(tabWidth - 40)
-		tab.inactive[2]:SetWidth(tabWidth - 40)
-		tab.text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		tab.active = TabPieces(tab, true)
+		tab.inactive = TabPieces(tab, false)
+		tab.text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		Loc(tab.text, keys[i])
-		tab:SetHighlightTexture("Interface\\PaperDollInfoFrame\\UI-Character-Tab-Highlight", "ADD")
-		local highlight = tab:GetHighlightTexture()
-		highlight:ClearAllPoints()
-		highlight:SetPoint("LEFT", tab, "LEFT", 10, -4)
-		highlight:SetPoint("RIGHT", tab, "RIGHT", -10, -4)
-		tab:SetScript("OnClick", function() SelectTab(i) end)
+		local tabHover = tab:CreateTexture(nil, "HIGHLIGHT")
+		tabHover:SetAllPoints()
+		tabHover:SetColorTexture(0.90, 0.66, 0.22, 0.10)
+		tab:SetScript("OnClick", function()
+			if selected ~= i and PlaySound then pcall(PlaySound, 841) end -- igCharacterInfoTab
+			SelectTab(i)
+		end)
 		tabs[i] = tab
 		local frame = CreateFrame("Frame", nil, box)
 		frame:SetPoint("TOPLEFT", panel, "TOPLEFT")
@@ -2329,32 +2579,25 @@ local function BuildPanel()
 	-- Each tab is as wide as its label (Ace3 style), so translations never squeeze or cut it.
 	function LayoutTabs()
 		for _, tab in ipairs(tabs) do
-			local width = math.max(80, math.floor(tab.text:GetStringWidth() + 44))
-			tab:SetWidth(width)
-			tab.active[2]:SetWidth(width - 40)
-			tab.inactive[2]:SetWidth(width - 40)
+			tab:SetWidth(math.max(90, math.floor(tab.text:GetStringWidth() + 40)))
 		end
 	end
 	LayoutTabs()
 	panel:HookScript("OnShow", function() SelectTab(selected) end)
 	SelectTab(1)
 
-	local parent = GetCSCoderParent()
-	if Settings and Settings.RegisterCanvasLayoutSubcategory and parent.category then
-		settingsCategory = Settings.RegisterCanvasLayoutSubcategory(parent.category, panel, SUBTITLE)
-	elseif InterfaceOptions_AddCategory then
-		panel.parent = parent.name
-		InterfaceOptions_AddCategory(panel)
-	end
+	BuildSettingsLanding()
 end
 
-function OpenPanel()
-	if Settings and Settings.OpenToCategory and settingsCategory then
-		Settings.OpenToCategory(settingsCategory:GetID())
-	elseif InterfaceOptionsFrame_OpenToCategory then
-		InterfaceOptionsFrame_OpenToCategory(panel)
-		InterfaceOptionsFrame_OpenToCategory(panel)
-	end
+-- Opens the options window (closing the game's Settings if it sent us here). toggle: a second
+-- click closes it (the minimap button).
+function OpenPanel(toggle)
+	if not configWindow then return end
+	if toggle and configWindow:IsShown() then configWindow:Hide() return end
+	if _G.SettingsPanel and _G.SettingsPanel:IsShown() and HideUIPanel then HideUIPanel(_G.SettingsPanel) end
+	if _G.InterfaceOptionsFrame and _G.InterfaceOptionsFrame:IsShown() and HideUIPanel then HideUIPanel(_G.InterfaceOptionsFrame) end
+	configWindow:Show()
+	configWindow:Raise()
 end
 
 ---------------------------------------------------------------------------------------------
@@ -2364,7 +2607,6 @@ end
 -- options panel's, so both stay in sync.
 ---------------------------------------------------------------------------------------------
 
-local ShowWizard
 do -- (a block of its own: the main chunk is near Lua's 200-locals limit)
 local WIZARD_WIDTH, WIZARD_HEIGHT = 860, 480
 local wizard
@@ -2400,14 +2642,12 @@ local function BuildWizard()
 	f:RegisterForDrag("LeftButton")
 	f:SetScript("OnDragStart", f.StartMoving)
 	f:SetScript("OnDragStop", f.StopMovingOrSizing)
-	if f.SetBackdrop then
-		f:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
-	end
+	Skin.Window(f, 44)
 	if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, f:GetName()) end -- Esc closes it
 	local header = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	header:SetPoint("TOPLEFT", 24, -20)
 	header:SetText(TITLE)
-	local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+	local close = Skin.Close(f)
 	close:SetPoint("TOPRIGHT", -6, -6)
 	f:Hide()
 	-- However it closes (X, Esc, a button), the guide doesn't come back on its own.
@@ -2448,11 +2688,11 @@ local function BuildWizard()
 	local version = welcome:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	version:SetPoint("BOTTOMRIGHT", -24, 20)
 	version:SetText(AddonVersion())
-	local useDefault = CreateFrame("Button", nil, welcome, "UIPanelButtonTemplate")
+	local useDefault = Skin.Button(welcome)
 	useDefault:SetSize(240, 30)
 	useDefault:SetPoint("BOTTOMRIGHT", welcome, "BOTTOM", -8, 40)
 	Loc(useDefault, "WIZ_USE_DEFAULT")
-	local configure = CreateFrame("Button", nil, welcome, "UIPanelButtonTemplate")
+	local configure = Skin.Button(welcome)
 	configure:SetSize(240, 30)
 	configure:SetPoint("BOTTOMLEFT", welcome, "BOTTOM", 8, 40)
 	Loc(configure, "WIZ_CONFIGURE")
@@ -2461,7 +2701,7 @@ local function BuildWizard()
 	local lookPage = NewPage()
 	AddWizardText(lookPage, "WIZ_LOOK_TITLE", "WIZ_LOOK_TEXT")
 	AddIconPicker(lookPage, 28, -112)
-	local lookDefault = CreateFrame("Button", nil, lookPage, "UIPanelButtonTemplate")
+	local lookDefault = Skin.Button(lookPage)
 	lookDefault:SetSize(130, 24)
 	lookDefault:SetPoint("TOPLEFT", 300, -124)
 	Loc(lookDefault, "WIZ_LOOK_DEFAULT")
@@ -2495,14 +2735,14 @@ local function BuildWizard()
 	footer:SetAllPoints()
 	local step = footer:CreateFontString(nil, "ARTWORK", "GameFontDisable")
 	step:SetPoint("BOTTOMLEFT", 28, 26)
-	local nextButton = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+	local nextButton = Skin.Button(footer)
 	nextButton:SetSize(130, 26)
 	nextButton:SetPoint("BOTTOMRIGHT", -24, 20)
-	local back = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+	local back = Skin.Button(footer)
 	back:SetSize(110, 26)
 	back:SetPoint("RIGHT", nextButton, "LEFT", -8, 0)
 	Loc(back, "WIZ_BACK")
-	local openOptions = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+	local openOptions = Skin.Button(footer)
 	openOptions:SetSize(200, 26)
 	openOptions:SetPoint("RIGHT", back, "LEFT", -8, 0)
 	Loc(openOptions, "WIZ_OPEN_OPTIONS")
@@ -2551,7 +2791,6 @@ end
 
 -- "What's new": shown once after an update (not on a fresh install, which gets the setup
 -- guide), and by /cqi news. The text is NEWS_TEXT in Locales.lua: update it for each release.
-local ShowNews
 do
 	local news
 	function ShowNews()
@@ -2566,9 +2805,7 @@ do
 			news:RegisterForDrag("LeftButton")
 			news:SetScript("OnDragStart", news.StartMoving)
 			news:SetScript("OnDragStop", news.StopMovingOrSizing)
-			if news.SetBackdrop then
-				news:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", tile = true, tileSize = 32, edgeSize = 32, insets = { left = 11, right = 12, top = 12, bottom = 11 } })
-			end
+			Skin.Window(news, 92)
 			if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, news:GetName()) end
 			local logo = news:CreateTexture(nil, "ARTWORK")
 			logo:SetSize(64, 64)
@@ -2585,12 +2822,12 @@ do
 			body:SetJustifyH("LEFT")
 			body:SetSpacing(4)
 			Loc(body, "NEWS_TEXT")
-			local ok = CreateFrame("Button", nil, news, "UIPanelButtonTemplate")
+			local ok = Skin.Button(news)
 			ok:SetSize(120, 26)
 			ok:SetPoint("BOTTOM", 0, 20)
 			Loc(ok, "NEWS_OK")
 			ok:SetScript("OnClick", function() news:Hide() end)
-			local close = CreateFrame("Button", nil, news, "UIPanelCloseButton")
+			local close = Skin.Close(news)
 			close:SetPoint("TOPRIGHT", -6, -6)
 		end
 		news.title:SetText(string.format(L.NEWS_TITLE, AddonVersion()))
@@ -2601,6 +2838,8 @@ end
 ---------------------------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------------------------
+
+end -- options window, setup guide, what's new
 
 -- Measures a real enemy nameplate (size, effective scale, health bar) for the preview. Saved, so
 -- the preview is right even before a plate shows up in a new session.

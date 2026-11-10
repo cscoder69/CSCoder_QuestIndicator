@@ -1165,3 +1165,16 @@ local news122 = {
 	itIT = "|cffffd200•|r Una spunta verde quando un nemico non serve più.\n|cffffd200•|r Il contatore pulsa quando sale e diventa dorato quando ne manca uno.\n|cffffd200•|r Una riga in chat quando una missione è pronta da consegnare.\n|cffffd200•|r Passa il mouse sul pulsante della minimappa per vedere cosa manca in ogni missione.\n|cffffd200•|r Temi rapidi: Classico, Discreto e Vistoso.\n|cffffd200•|r Un pulsante per ascoltare ogni suono nel menu.\n\nOgnuno si può disattivare nelle opzioni.",
 }
 for code, text in pairs(news122) do locales[code].NEWS_TEXT = text end
+
+-- The page under Options > AddOns: the options live in their own window.
+local landing = {
+	enUS = { "The options open in their own window, with a live preview.\n\nYou can also open them with |cff00ff00/cqi|r or the minimap button.", "Open settings" },
+	ptBR = { "As opções abrem numa janela própria, com prévia ao vivo.\n\nVocê também pode abri-las com |cff00ff00/cqi|r ou pelo botão do minimapa.", "Abrir configurações" },
+	esES = { "Las opciones se abren en su propia ventana, con vista previa en vivo.\n\nTambién puedes abrirlas con |cff00ff00/cqi|r o con el botón del minimapa.", "Abrir configuración" },
+	deDE = { "Die Optionen öffnen sich in einem eigenen Fenster, mit Live-Vorschau.\n\nDu kannst sie auch mit |cff00ff00/cqi|r oder dem Minimap-Knopf öffnen.", "Einstellungen öffnen" },
+	frFR = { "Les options s'ouvrent dans leur propre fenêtre, avec un aperçu en direct.\n\nVous pouvez aussi les ouvrir avec |cff00ff00/cqi|r ou le bouton de la minicarte.", "Ouvrir les réglages" },
+	itIT = { "Le opzioni si aprono in una finestra tutta loro, con anteprima dal vivo.\n\nPuoi aprirle anche con |cff00ff00/cqi|r o con il pulsante della minimappa.", "Apri impostazioni" },
+}
+for code, texts in pairs(landing) do
+	locales[code].LANDING_TEXT, locales[code].LANDING_OPEN = texts[1], texts[2]
+end

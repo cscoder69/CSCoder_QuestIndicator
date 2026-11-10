@@ -95,7 +95,7 @@ live in game after `/reload`.
   Translated in all 6 languages (2026-11-09).
 - **Icon anchor** (`anchor`, `objectAnchor`): top/bottom/left/right of the plate; side anchors use
   the health bar (`PlateBar`). Changing it resets X/Y to that side's start.
-- **Lua 200-locals limit:** the main chunk is close to it (8 free after v1.2.1). New helpers
+- **Lua 200-locals limit:** the main chunk is close to it (see UI v2 below for the current room). New helpers
   go inside `do ... end` blocks (see the setup guide and the plate measuring code).
 - **Plates on WoW Forever are restricted:** GetTop/GetPoint error ("Can't measure restricted
   regions"); size and scale can be read. `MeasurePlate` protects every read and estimates the bar.
@@ -119,6 +119,19 @@ live in game after `/reload`.
   `questLog.summary`), quick themes (Icon section, `THEMES` inside `BuildIconTab`), play button
   per row in the sound menu (`AddDropdown(..., preview)`). NEWS_TEXT already says 1.2.2.
   The arrow to the nearest quest mob goes in a separate branch later (user: test it apart).
+- **UI v2 (branch `feature/ui-v2`, on top of v1.2.2, NOT released; the user tests both together):**
+  OneForAll-inspired look (study of OneForAll v6.2.2 on 2026-11-09: flat dark warm panels, thin gold
+  ring, gold text, switches, gold-filled sliders, browser-style tabs, hover on the HIGHLIGHT layer).
+  - `Skin` kit (one table): `Panel`, `Window(f, bandHeight)`, `Button`, `Close`, `Switch(check)`,
+    `Slider(slider, low, high, width)`, `Edges`, `Recolor`. Flat colour textures plus one smooth
+    circle (`icons/ui/circle.tga`, made by `tools/make_ui.lua`) for knobs/thumbs/pill ends.
+  - The options live in their **own window** (`BuildConfigWindow`, `ADDON.."Config"`, 780x680,
+    movable, position in `root.windowPos`, Esc closes, open/close sounds). The Settings entry is a
+    landing page (`BuildSettingsLanding`: logo, text, "Open settings"). `OpenPanel(toggle)` opens
+    the window; the minimap button toggles it.
+  - The whole options/guide/news section is one `do ... end` block exporting `BuildPanel`,
+    `ShowWizard`, `ShowNews`; the gate conditions are one table `On` (`On.MobsOn()` ...). About 48
+    main-chunk locals free after this. A block does not lower the peak inside it: only tables do.
 - **Badge experiment** (2026-11-09): built, tried in game, user found it ugly and dropped it; the
   commits were reverted. Do not bring it back unless asked (maybe with real artwork).
 - `/cqi` opens the options, `/cqi toggle` toggles the addon, `/cqi setup` the guide, `/cqi news` what's new, `/cqi plate` measures the target plate.
