@@ -187,6 +187,16 @@ do
 	local completing = false
 	for _, f in ipairs(frames) do if rawget(f, "completing") then completing = true end end
 	print("quest: check mark shown", completing)
+
+	-- Inside a dungeon (hideInInstances is on by default) the mob gets no icon.
+	related = true
+	env.IsInInstance = function() return true, "party" end
+	try("plate in dungeon", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
+	try("plate in dungeon", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
+	local shownInDungeon = false
+	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then shownInDungeon = true end end
+	print("quest: icon hidden in a dungeon", not shownInDungeon)
+	env.IsInInstance = nil
 	env.UnitExists = function() return false end
 	env.C_NamePlate.GetNamePlates = function() return {} end
 	env.C_NamePlate.GetNamePlateForUnit = function() return nil end
@@ -199,7 +209,7 @@ local db = env.CSCoderQuestIndicatorDB
 local names = {}
 for name in pairs(db.profiles) do names[#names + 1] = name end
 print("profiles:", table.concat(names, ", "), "| char ->", db.chars["Tester - Realm"], "| language:", db.language)
-local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1, CreateColor = 1, SettingsPanel = 1, InterfaceOptionsFrame = 1, HideUIPanel = 1 }
+local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1, CreateColor = 1, IsInInstance = 1, SettingsPanel = 1, InterfaceOptionsFrame = 1, HideUIPanel = 1 }
 local unexpected = {}
 for k in pairs(missing) do if not known[k] then unexpected[#unexpected + 1] = k end end
 print("unexpected nil globals:", #unexpected == 0 and "none" or table.concat(unexpected, ", "))

@@ -1178,3 +1178,16 @@ local landing = {
 for code, texts in pairs(landing) do
 	locales[code].LANDING_TEXT, locales[code].LANDING_OPEN = texts[1], texts[2]
 end
+
+-- Hide in dungeons and raids (on by default).
+local hideInstances = {
+	enUS = { "Hide in dungeons and raids", "No icons inside dungeons and raids; they come back when you leave." },
+	ptBR = { "Esconder em masmorras e raides", "Nenhum ícone dentro de masmorras e raides; eles voltam quando você sai." },
+	esES = { "Ocultar en mazmorras y bandas", "Sin iconos dentro de mazmorras y bandas; vuelven al salir." },
+	deDE = { "In Dungeons und Schlachtzügen ausblenden", "Keine Symbole in Dungeons und Schlachtzügen; sie kommen zurück, wenn du sie verlässt." },
+	frFR = { "Masquer en donjon et en raid", "Aucune icône dans les donjons et les raids ; elles reviennent quand vous en sortez." },
+	itIT = { "Nascondi in spedizioni e incursioni", "Nessuna icona dentro spedizioni e incursioni; tornano quando esci." },
+}
+for code, texts in pairs(hideInstances) do
+	locales[code].HIDE_INSTANCES, locales[code].HIDE_INSTANCES_TIP = texts[1], texts[2]
+end

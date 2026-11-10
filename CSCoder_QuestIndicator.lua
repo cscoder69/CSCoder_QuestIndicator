@@ -51,6 +51,7 @@ local DEFAULTS = {
 	minimap = true,      -- minimap button
 	minimapAngle = 220,  -- its position around the minimap (degrees)
 	sound = true,        -- play a sound when a quest objective completes
+	hideInInstances = true, -- no icons inside dungeons and raids
 	doneCheck = true,    -- an icon that stops being needed turns into a check mark, then fades
 	readyAlert = true,   -- chat line when every objective of a quest is done
 	minimapSummary = true, -- the minimap button's tooltip lists the open objectives
@@ -646,9 +647,16 @@ local function UpdateCombatAlpha()
 	for _, f in pairs(icons) do f:SetAlpha(alpha) end
 end
 
+-- Inside a dungeon or raid (party / raid instance), with "Hide in dungeons and raids" on.
+local function InstanceHidden()
+	if not (db.hideInInstances and IsInInstance) then return false end
+	local inside, kind = IsInInstance()
+	return inside and (kind == "party" or kind == "raid") or false
+end
+
 local function Refresh(unit)
 	local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit(unit)
-	if db.active and db.enabled and plate then
+	if db.active and db.enabled and plate and not InstanceHidden() then
 		local needed, kind, progress = IsQuestMob(unit)
 		if needed then ShowIcon(unit, plate, kind, progress) return end
 		if not UnitIsDead(unit) then HideOrComplete(unit) return end
@@ -840,7 +848,7 @@ local function UpdateGate(isQuest)
 end
 
 function RefreshSoftObject()
-	if not ObjectsOn() then
+	if not ObjectsOn() or InstanceHidden() then
 		UpdateGate(false)
 		HideIcon(SOFT)
 		return
@@ -1891,7 +1899,7 @@ local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "g
 local PROGRESS_KEYS = { "progress", "objectProgress", "progressPulse", "progressAttach", "progressFloat", "progressSize", "progressFont",
 	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressX", "progressY" }
 local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice",
-	"doneCheck", "readyAlert", "minimapSummary" }
+	"hideInInstances", "doneCheck", "readyAlert", "minimapSummary" }
 
 local function ResetKeys(keys)
 	for _, key in ipairs(keys) do db[key] = DEFAULTS[key] end
@@ -2091,6 +2099,7 @@ local function BuildBehaviorTab(tab)
 	GateCheck(On.AddonOn, AddCheck(tab, "READY_ALERT", "READY_ALERT_TIP", "readyAlert", COL1, TOP - 208))
 	GateCheck(function() return db.minimap end,
 		AddCheck(tab, "MINIMAP_SUMMARY", "MINIMAP_SUMMARY_TIP", "minimapSummary", COL2, TOP - 160))
+	GateCheck(On.AnyIconOn, AddCheck(tab, "HIDE_INSTANCES", "HIDE_INSTANCES_TIP", "hideInInstances", COL2, TOP - 208))
 end
 
 -- Profiles tab in the Ace3 layout players know from RareScanner and many others: intro, reset,
