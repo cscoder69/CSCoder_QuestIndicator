@@ -2240,7 +2240,7 @@ end
 
 local function BuildProfilesTab(tab)
 	-- This tab is laid out from the panel's top; the box starts lower in the options window.
-	local TOP = TOP - 36
+	local TOP, LEFT = TOP - 48, LEFT + 20
 	local function Desc(key, y)
 		local fs = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 		fs:SetPoint("TOPLEFT", LEFT, y)
@@ -2328,8 +2328,8 @@ local CONTENT_WIDTH = 600 -- until the scroll frame reports its real width
 
 local function BuildSettingsTab(tab, box)
 	local scroll = CreateFrame("ScrollFrame", nil, tab, "UIPanelScrollFrameTemplate")
-	scroll:SetPoint("TOPLEFT", box, "TOPLEFT", 4, -8)
-	scroll:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -26, 6)
+	scroll:SetPoint("TOPLEFT", box, "TOPLEFT", 12, -14)
+	scroll:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -32, 14)
 	local content = CreateFrame("Frame", nil, scroll)
 	content:SetWidth(CONTENT_WIDTH)
 	scroll:SetScrollChild(content)
@@ -2341,7 +2341,7 @@ local function BuildSettingsTab(tab, box)
 	for _, s in ipairs(SETTINGS_SECTIONS) do
 		local section = CreateFrame("Frame", nil, content)
 		section:SetHeight(1)
-		section:SetPoint("TOPLEFT", content, "TOPLEFT", -12, -(y + SECTION_HEADER) - TOP)
+		section:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(y + SECTION_HEADER) - TOP)
 		section:SetPoint("RIGHT", content, "RIGHT")
 		local heading = section:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 		heading:SetPoint("TOPLEFT", section, "TOPLEFT", LEFT, TOP + SECTION_HEADER - 8)
@@ -2361,7 +2361,7 @@ local configWindow -- the options window (the panel lives inside it)
 
 local function BuildConfigWindow()
 	local w = CreateFrame("Frame", ADDON .. "Config", UIParent)
-	w:SetSize(780, 680)
+	w:SetSize(840, 730)
 	w:SetFrameStrata("DIALOG")
 	w:SetToplevel(true)
 	w:SetClampedToScreen(true)
@@ -2374,10 +2374,10 @@ local function BuildConfigWindow()
 		local point, _, relativePoint, x, y = self:GetPoint()
 		if x and y then root.windowPos = { point, relativePoint, math.floor(x + 0.5), math.floor(y + 0.5) } end
 	end)
-	Skin.Window(w, 76)
+	Skin.Window(w, 84)
 	if _G.UISpecialFrames then table.insert(_G.UISpecialFrames, w:GetName()) end -- Esc closes it
 	local close = Skin.Close(w)
-	close:SetPoint("TOPRIGHT", -12, -12)
+	close:SetPoint("TOPRIGHT", -18, -18)
 	w:SetScript("OnShow", function(self)
 		self:ClearAllPoints()
 		local pos = root.windowPos
@@ -2431,7 +2431,7 @@ function BuildPanel()
 	configWindow = BuildConfigWindow()
 	local logo = panel:CreateTexture(nil, "ARTWORK")
 	logo:SetSize(52, 52)
-	logo:SetPoint("TOPLEFT", 14, -12)
+	logo:SetPoint("TOPLEFT", 22, -16)
 	logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\icons\\logo")
 	local header = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	header:SetPoint("TOPLEFT", logo, "TOPRIGHT", 10, -8)
@@ -2445,7 +2445,7 @@ function BuildPanel()
 	versionText:SetText(version)
 	local sub = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	sub:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -6)
-	sub:SetPoint("RIGHT", panel, "RIGHT", -170, 0)
+	sub:SetPoint("RIGHT", panel, "RIGHT", -190, 0)
 	sub:SetJustifyH("LEFT")
 	sub:SetTextColor(0.90, 0.68, 0.30)
 	Loc(sub, "DESC")
@@ -2453,8 +2453,8 @@ function BuildPanel()
 	-- Options box over the whole panel, in the Ace3 tab style players know (BlizzMove and many others):
 	-- the game's options-frame tab textures on top of a bordered pane, tabs stretched to fill it.
 	local box = CreateFrame("Frame", nil, panel)
-	box:SetPoint("TOPLEFT", 12, -112)
-	box:SetPoint("BOTTOMRIGHT", -12, 12)
+	box:SetPoint("TOPLEFT", 22, -128)
+	box:SetPoint("BOTTOMRIGHT", -22, 22)
 	Skin.Panel(box, { 0.045, 0.045, 0.055, 0.85 }, Skin.RING)
 
 	-- The preview lives in its own small window (movable, closable), so the options get the whole
@@ -2498,7 +2498,7 @@ function BuildPanel()
 
 	local toggle = Skin.Button(panel)
 	toggle:SetSize(110, 22)
-	toggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -44, -12)
+	toggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -50, -18)
 	Loc(toggle, "PREVIEW")
 	toggle:SetScript("OnClick", function()
 		if window:IsShown() then
