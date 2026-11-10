@@ -199,6 +199,7 @@ end
 
 -- Quest objects need both the master switch and their own option.
 local function ObjectsOn() return db.active and db.objects end
+local UsablePlate -- defined with the icons
 local RefreshSoftObject, EnableObjectNameplates, RestoreObjectCVars -- soft-target objects
 local RefreshControls, UpdatePreview, UpdateMinimapButton, UpdateGates, LayoutTabs -- options UI
 local settingsScroll -- the scrolling settings page
@@ -647,6 +648,19 @@ local function UpdateCombatAlpha()
 	for _, f in pairs(icons) do f:SetAlpha(alpha) end
 end
 
+-- A unit's nameplate if the addon may use it. In dungeons and raids the game can hand out
+-- "forbidden" plates (other addons may not touch them): anchoring to one, or measuring it,
+-- raises errors, so those count as no plate.
+function UsablePlate(unit)
+	local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unit)
+	if not plate then return nil end
+	if plate.IsForbidden then
+		local ok, forbidden = pcall(plate.IsForbidden, plate)
+		if not ok or forbidden then return nil end
+	end
+	return plate
+end
+
 -- Inside a dungeon or raid (party / raid instance), with "Hide in dungeons and raids" on.
 local function InstanceHidden()
 	if not (db.hideInInstances and IsInInstance) then return false end
@@ -655,7 +669,7 @@ local function InstanceHidden()
 end
 
 local function Refresh(unit)
-	local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit(unit)
+	local plate = UsablePlate(unit)
 	if db.active and db.enabled and plate and not InstanceHidden() then
 		local needed, kind, progress = IsQuestMob(unit)
 		if needed then ShowIcon(unit, plate, kind, progress) return end
@@ -672,7 +686,7 @@ local function RefreshAll()
 	end
 	RefreshSoftObject()
 	for unit in pairs(icons) do
-		if not C_NamePlate.GetNamePlateForUnit(unit) then HideIcon(unit) end
+		if not UsablePlate(unit) then HideIcon(unit) end
 	end
 end
 
@@ -856,7 +870,7 @@ function RefreshSoftObject()
 	local isQuest, kind, progress = false, nil, nil
 	if UnitExists(SOFT) then isQuest, kind, progress = IsQuestObject(SOFT) end
 	UpdateGate(isQuest)
-	local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit(SOFT)
+	local plate = UsablePlate(SOFT)
 	if isQuest and plate then
 		if icons[SOFT] and icons[SOFT]:GetParent() ~= plate then HideIcon(SOFT) end
 		ShowIcon(SOFT, plate, kind, progress)
@@ -2897,8 +2911,8 @@ end
 
 function MeasurePlate(unit, force)
 	if (plateMeasured and not force) or not (root and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
-	local plate = C_NamePlate.GetNamePlateForUnit(unit)
-	if not plate then return end
+	local plate = UsablePlate(unit)
+	if not plate or (IsInInstance and IsInInstance()) then return end -- measured in the open world only
 	local w, h = Read(plate, "GetSize")
 	local eff = Read(plate, "GetEffectiveScale")
 	if not (w and h and eff) or w <= 0 or h <= 0 then return end

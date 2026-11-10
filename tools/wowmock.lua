@@ -197,6 +197,16 @@ do
 	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then shownInDungeon = true end end
 	print("quest: icon hidden in a dungeon", not shownInDungeon)
 	env.IsInInstance = nil
+
+	-- A forbidden plate (dungeons can hand them out) is never touched, even with the option off.
+	profile.hideInInstances = false
+	rawset(mobPlate, "IsForbidden", function() return true end)
+	try("forbidden plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
+	try("forbidden plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
+	local onForbidden = false
+	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then onForbidden = true end end
+	print("quest: forbidden plate left alone", not onForbidden)
+	profile.hideInInstances = true
 	env.UnitExists = function() return false end
 	env.C_NamePlate.GetNamePlates = function() return {} end
 	env.C_NamePlate.GetNamePlateForUnit = function() return nil end
