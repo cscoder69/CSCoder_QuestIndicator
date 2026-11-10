@@ -56,6 +56,7 @@ local DEFAULTS = {
 	readyAlert = true,   -- chat line when every objective of a quest is done
 	minimapSummary = true, -- the minimap button's tooltip lists the open objectives
 	soundChoice = "coins", -- key in QUEST_SOUNDS
+	soundVolume = 100,   -- its volume in percent
 }
 -- Saved layout: CSCoderQuestIndicatorDB = { version, language, profiles = { name = settings },
 -- chars = { "Name - Realm" = profile name }, savedCVars }.
@@ -714,9 +715,38 @@ local objectiveStates = {} -- questID -> { [objective index] = finished }, to he
 local QUEST_SOUNDS = { coins = 120, auction = 5274, auctionclose = 1204, worldquest = 44295, bell = 6674, questlog = 875, quest = 878 }
 local QUEST_SOUND_ORDER = { "coins", "auction", "auctionclose", "worldquest", "bell", "questlog", "quest" }
 
+-- Plays a sound at the chosen volume. The game has no volume per sound, only per channel: at
+-- 100% it plays on Master as before; below, it plays on the Dialog channel, whose volume is set
+-- for a moment and put back 3 s after the last sound (also at the next login, if the game was
+-- closed meanwhile: root.dialogVolume).
+local PlaySoundAt
+do
+	local pending -- the latest sound waiting to restore the volume
+	function PlaySoundAt(id)
+		if not (PlaySound and id) then return end
+		local volume = (tonumber(db.soundVolume) or 100) / 100
+		local canSet = C_CVar and C_CVar.GetCVar and C_CVar.SetCVar
+		local dialogOn = canSet and tostring(C_CVar.GetCVar("Sound_EnableDialog")) ~= "0"
+		if volume >= 0.995 or not dialogOn then
+			pcall(PlaySound, id, "Master")
+			return
+		end
+		if volume <= 0 then return end
+		if root.dialogVolume == nil then root.dialogVolume = C_CVar.GetCVar("Sound_DialogVolume") end
+		pcall(C_CVar.SetCVar, "Sound_DialogVolume", volume)
+		pcall(PlaySound, id, "Dialog")
+		local token = {}
+		pending = token
+		C_Timer.After(3, function()
+			if pending ~= token or root.dialogVolume == nil then return end
+			pcall(C_CVar.SetCVar, "Sound_DialogVolume", root.dialogVolume)
+			root.dialogVolume = nil
+		end)
+	end
+end
+
 local function PlayQuestSound()
-	local id = QUEST_SOUNDS[db.soundChoice] or QUEST_SOUNDS[DEFAULTS.soundChoice]
-	if PlaySound then pcall(PlaySound, id, "Master") end
+	PlaySoundAt(QUEST_SOUNDS[db.soundChoice] or QUEST_SOUNDS[DEFAULTS.soundChoice])
 end
 
 local RebuildObjectiveTexts
@@ -1913,7 +1943,7 @@ local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "g
 local PROGRESS_KEYS = { "progress", "objectProgress", "progressPulse", "progressAttach", "progressFloat", "progressSize", "progressFont",
 	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressX", "progressY" }
 local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice",
-	"hideInInstances", "doneCheck", "readyAlert", "minimapSummary" }
+	"soundVolume", "hideInInstances", "doneCheck", "readyAlert", "minimapSummary" }
 
 local function ResetKeys(keys)
 	for _, key in ipairs(keys) do db[key] = DEFAULTS[key] end
@@ -2101,19 +2131,20 @@ local function BuildBehaviorTab(tab)
 		function() return db.soundChoice end,
 		function(value) db.soundChoice = value; PlayQuestSound() end,
 		COL2 + 4, TOP - 104, 140, nil,
-		function(value) if PlaySound then pcall(PlaySound, QUEST_SOUNDS[value], "Master") end end))
+		function(value) PlaySoundAt(QUEST_SOUNDS[value]) end))
 	local test = Skin.Button(tab)
 	test:SetSize(70, 22)
 	test:SetPoint("TOPLEFT", COL2 + 152, TOP - 123)
 	Loc(test, "SOUND_TEST")
 	test:SetScript("OnClick", PlayQuestSound)
 	Gate(SoundOn, test)
+	Gate(SoundOn, AddSlider(tab, "SOUND_VOLUME", "soundVolume", 0, 100, 5, COL2 + 4, TOP - 160, "%d"))
 
 	GateCheck(On.AnyIconOn, AddCheck(tab, "DONE_CHECK", "DONE_CHECK_TIP", "doneCheck", COL1, TOP - 160))
 	GateCheck(On.AddonOn, AddCheck(tab, "READY_ALERT", "READY_ALERT_TIP", "readyAlert", COL1, TOP - 208))
 	GateCheck(function() return db.minimap end,
-		AddCheck(tab, "MINIMAP_SUMMARY", "MINIMAP_SUMMARY_TIP", "minimapSummary", COL2, TOP - 160))
-	GateCheck(On.AnyIconOn, AddCheck(tab, "HIDE_INSTANCES", "HIDE_INSTANCES_TIP", "hideInInstances", COL2, TOP - 208))
+		AddCheck(tab, "MINIMAP_SUMMARY", "MINIMAP_SUMMARY_TIP", "minimapSummary", COL2, TOP - 210))
+	GateCheck(On.AnyIconOn, AddCheck(tab, "HIDE_INSTANCES", "HIDE_INSTANCES_TIP", "hideInInstances", COL2, TOP - 258))
 end
 
 -- Profiles tab in the Ace3 layout players know from RareScanner and many others: intro, reset,
@@ -2335,7 +2366,7 @@ local SETTINGS_SECTIONS = {
 	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 258 },
 	{ key = "TAB_ICON", build = BuildIconTab, height = 312 },
 	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 340 },
-	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 262 },
+	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 316 },
 }
 local SECTION_GAP = 18
 local CONTENT_WIDTH = 600 -- until the scroll frame reports its real width
@@ -2989,6 +3020,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		RefreshSoftObject()
 	elseif event == "PLAYER_LOGIN" then
 		ResolveCharacter() -- the character name is certain by now
+		if root.dialogVolume ~= nil and C_CVar and C_CVar.SetCVar then
+			pcall(C_CVar.SetCVar, "Sound_DialogVolume", root.dialogVolume)
+			root.dialogVolume = nil
+		end
 		print(string.format(L.WELCOME, "|cffffd200" .. TITLE .. "|r", AddonVersion(), "|cff00ff00/cqi|r"))
 		-- First time on this character: the setup guide, once the loading screen is gone.
 		-- After an update: what's new, once (not in a dev copy, whose version is "dev").

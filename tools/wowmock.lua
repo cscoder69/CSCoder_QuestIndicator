@@ -160,12 +160,21 @@ do
 	env.print = function(text) printed[#printed + 1] = tostring(text) end
 	env.PlaySound = function() sounds = sounds + 1 end
 	try("quest scan 1", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
-	local summary = 0
+	-- At 50% the sound plays on the Dialog channel, whose volume is set and then put back.
+	profile.soundVolume = 50
+	local cvars, channel = { Sound_EnableDialog = "1", Sound_DialogVolume = "0.8" }, nil
+	local getCVar, setCVar = env.C_CVar.GetCVar, env.C_CVar.SetCVar
+	env.C_CVar.GetCVar = function(name) return cvars[name] or "0" end
+	env.C_CVar.SetCVar = function(name, value) cvars[name] = tostring(value) end
+	env.PlaySound = function(_, ch) sounds = sounds + 1; channel = ch end
 	finished = true
 	try("quest scan 2", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
 	local ready = false
 	for _, line in ipairs(printed) do if line:find("The Kobold Threat", 1, true) then ready = true end end
 	print("quest: sound played", sounds > 0, "| ready announced", ready)
+	print("quest: volume 50% on", channel, "| dialog volume back to", cvars.Sound_DialogVolume, "| pending", saved.dialogVolume)
+	env.C_CVar.GetCVar, env.C_CVar.SetCVar = getCVar, setCVar
+	profile.soundVolume = 100
 
 	-- A quest mob on a nameplate: needed (icon), then not needed right after the objective
 	-- finished -> its icon turns into the check mark instead of vanishing.

@@ -6,23 +6,27 @@ A floating, animated **"!"** over the mobs and items you still need for your que
 
 ## Features
 
+- **Its own options window**, in a clean dark-and-gold look: switches, sliders with typed values, menus and a live preview. Open it with /cqi or the minimap button.
 - **Setup guide:** new characters get a short guide: start with the defaults, or pick your icon, size, position and what to show, with a live preview.
 - **Quest mobs:** a "!" floats above the nameplate of every mob you still need for an active quest. It disappears once the objective is done.
 - **Quest items:** herbs, crates, sprouts and other quest items on the ground get a "!" too, on the nearest one in front of you.
 - **37 icons in 3 categories:** Standard (quests), Themed and States / Priority, picked from a window that shows each category.
 
   ![Icon styles](media/icon_styles.png)
-- **Quest progress:** the objective count ("8/12") next to each quest mob, glued to the icon or placed on its own, with its own size, font, outline and color. It can show on quest items too.
-- **Sound when an objective completes**, with a choice of sounds.
+- **Quest progress:** the objective count ("8/12") next to each quest mob, glued to the icon or placed on its own, with its own size, font, outline and color. It can show on quest items too, pulses when it goes up and turns gold when one is left.
+- **Check mark when done:** mobs you no longer need show a green check mark before their icon goes.
+- **Ready to turn in:** a chat line when every objective of a quest is done.
+- **Sound when an objective completes**, with a choice of sounds (hear each one in the menu) and its own volume.
 - **Color by quest type:** daily and repeatable quests in blue, group and elite quests in red.
 - **Float and glow:** adjustable float height and duration, optional glow with adjustable intensity.
 - **Size and position:** size, anchor (top, bottom, left or right of the nameplate) and X/Y for mobs and items; type exact values or use the sliders.
 - **Own look for quest items:** their own icon, float and glow, if you like.
-- **In combat:** keep, fade or hide the icons.
+- **In combat:** keep, fade or hide the icons. **Hidden in instanced content** (dungeons and raids) by default.
+- **Quick themes:** Classic, Subtle or Flashy in one click.
 - **Live preview** in its own small window, sized like your real nameplates.
 - **Profiles:** create, copy, reset and delete; each character remembers its profile. Export a profile as text and import it on another PC or from a friend.
 - **Help on hover** for the options, and a short "what's new" after each update.
-- **Minimap button:** left-click opens the options, right-click turns the addon on or off, drag to move.
+- **Minimap button:** hover for a summary of what is left of each quest; left-click opens the options, right-click turns the addon on or off, drag to move.
 - **Languages:** English, Português (Brasil), Español, Deutsch, Français, Italiano. Other game languages use English.
 
 ## How to use

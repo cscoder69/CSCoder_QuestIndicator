@@ -1202,3 +1202,18 @@ local news122b = {
 	itIT = "|cffffd200•|r Nuovo aspetto: le opzioni si aprono in una finestra tutta loro, con interruttori, pulsanti e cursori dorati.\n|cffffd200•|r Una spunta verde quando un nemico non serve più.\n|cffffd200•|r Il contatore pulsa quando sale e diventa dorato quando ne manca uno.\n|cffffd200•|r Una riga in chat quando una missione è pronta da consegnare.\n|cffffd200•|r Passa il mouse sul pulsante della minimappa per vedere cosa manca in ogni missione.\n|cffffd200•|r Temi rapidi: Classico, Discreto e Vistoso.\n|cffffd200•|r Un pulsante per ascoltare ogni suono nel menu.\n|cffffd200•|r Le icone si nascondono in spedizioni e incursioni.\n\nOgnuno si può disattivare nelle opzioni.",
 }
 for code, text in pairs(news122b) do locales[code].NEWS_TEXT = text end
+
+-- Sound volume, and its line in what's new.
+local volume = {
+	enUS = { "Volume", "How loud the objective sound plays. Below 100% it plays on the game's Dialog channel.", "A volume slider for the objective sound." },
+	ptBR = { "Volume", "O volume do som do objetivo. Abaixo de 100% ele toca no canal de Diálogo do jogo.", "Uma barra de volume para o som do objetivo." },
+	esES = { "Volumen", "Lo fuerte que suena el sonido del objetivo. Por debajo del 100% suena en el canal de Diálogo del juego.", "Una barra de volumen para el sonido del objetivo." },
+	deDE = { "Lautstärke", "Wie laut der Zielton spielt. Unter 100% spielt er im Dialogkanal des Spiels.", "Ein Lautstärkeregler für den Zielton." },
+	frFR = { "Volume", "Le volume du son d'objectif. En dessous de 100 %, il joue sur le canal Dialogue du jeu.", "Un curseur de volume pour le son d'objectif." },
+	itIT = { "Volume", "Quanto è forte il suono dell'obiettivo. Sotto il 100% suona sul canale Dialoghi del gioco.", "Un cursore del volume per il suono dell'obiettivo." },
+}
+for code, texts in pairs(volume) do
+	local l = locales[code]
+	l.SOUND_VOLUME, l.TIP_SOUND_VOLUME = texts[1], texts[2]
+	if l.NEWS_TEXT then l.NEWS_TEXT = l.NEWS_TEXT:gsub("\n\n", "\n|cffffd200•|r " .. texts[3] .. "\n\n", 1) end
+end

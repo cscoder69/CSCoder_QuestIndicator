@@ -1,6 +1,6 @@
 # CS.Coder - Quest Indicator — notes for Claude (and any dev)
 
-Read this first when working on the addon. Last updated 2026-11-09 (v1.2.1 published).
+Read this first when working on the addon. Last updated 2026-11-09 (v1.2.2 published).
 
 ## Working with the user
 - Chat in **Brazilian Portuguese**; code, comments, commits, docs and in-game text in **English**.
@@ -111,7 +111,7 @@ live in game after `/reload`.
   every release.**
 - **Profile sharing** (Profiles tab, `OpenShareWindow`): "CQI1:key=bTRUE/nNUM/sTEXT;..." with
   %XX escapes; import only takes known keys of the right type into the current profile.
-- **v1.2.2 (branch `feature/v1.2.2`, NOT released, waiting for the user's in-game test):**
+- **v1.2.2 (released 2026-11-09):**
   check mark when done (`doneCheck`, `HideOrComplete`: an icon that stops being needed within
   3 s of an objective finishing turns into ReadyCheck-Ready and fades; `questLog.completedAt`),
   animated count (`progressPulse`: `f.textPop` when the number goes up, gold with one left),
@@ -119,7 +119,7 @@ live in game after `/reload`.
   `questLog.summary`), quick themes (Icon section, `THEMES` inside `BuildIconTab`), play button
   per row in the sound menu (`AddDropdown(..., preview)`). NEWS_TEXT already says 1.2.2.
   The arrow to the nearest quest mob goes in a separate branch later (user: test it apart).
-- **UI v2 (branch `feature/ui-v2`, on top of v1.2.2, NOT released; the user tests both together):**
+- **UI v2 (released in v1.2.2):**
   OneForAll-inspired look (study of OneForAll v6.2.2 on 2026-11-09: flat dark warm panels, thin gold
   ring, gold text, switches, gold-filled sliders, browser-style tabs, hover on the HIGHLIGHT layer).
   - `Skin` kit (one table): `Panel`, `Window(f, bandHeight)`, `Button`, `Close`, `Switch(check)`,
@@ -132,6 +132,11 @@ live in game after `/reload`.
   - The whole options/guide/news section is one `do ... end` block exporting `BuildPanel`,
     `ShowWizard`, `ShowNews`; the gate conditions are one table `On` (`On.MobsOn()` ...). About 48
     main-chunk locals free after this. A block does not lower the peak inside it: only tables do.
+- **Sound volume** (`soundVolume`, 0-100): below 100% `PlaySoundAt` plays on the Dialog channel and
+  sets `Sound_DialogVolume` for 3 s (original kept in `root.dialogVolume`, restored at login if the
+  game closed meanwhile). At 100% it plays on Master.
+- **Hide in instanced content** (`hideInInstances`, on by default; the user's tester got errors in
+  dungeons). `UsablePlate(unit)` never returns forbidden plates; plates are measured outside instances only.
 - **Badge experiment** (2026-11-09): built, tried in game, user found it ugly and dropped it; the
   commits were reverted. Do not bring it back unless asked (maybe with real artwork).
 - `/cqi` opens the options, `/cqi toggle` toggles the addon, `/cqi setup` the guide, `/cqi news` what's new, `/cqi plate` measures the target plate.
@@ -171,6 +176,9 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
 - 1.2.1 (2026-11-09): setup guide, icon anchor, items' own look and count, re-cut icons, new sound
   list (picked by ear), hover help, what's new window, profile export/import, welcome line,
   restricted-plate fixes. Version numbers: third digit only for now.
+- 1.2.2 (2026-11-09): own options window in a OneForAll-like look (Settings keeps a landing page),
+  check mark when done, animated count, ready alert, minimap summary, quick themes, sound preview
+  and volume, hide in instanced content (default on), forbidden-plate safety.
 
 ## Ideas the user liked, not done yet
 - ~~Separate look for mobs vs items~~ DONE in v1.2.1 (`objectOwnLook`).
