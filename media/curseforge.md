@@ -25,7 +25,7 @@ A floating "!" over every quest mob and item you still need, with live progress 
 - **Color by quest type**: daily quests in blue, group quests in red.
 - **Hidden in instanced content** (dungeons and raids) by default; keep, fade or hide icons in combat.
 - **Profiles** per character, with export and import to share them.
-- **6 languages**: English, Português (Brasil), Español, Deutsch, Français, Italiano.
+- **6 languages**: English, Portuguese (Brazil), Spanish, German, French, Italian.
 
 ![Icon styles](https://raw.githubusercontent.com/cscoder69/CSCoder_QuestIndicator/main/media/icon_styles.png)
 
