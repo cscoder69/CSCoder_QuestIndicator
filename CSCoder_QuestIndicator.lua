@@ -356,12 +356,22 @@ local function IsQuestMob(unit)
 		if ok and related ~= nil then
 			if not related then return false end
 			local state, title, progress = ByTooltipInfo(unit)
-			if state == false then return false end
-			return true, KindOf(title), progress
+			if state ~= false then return true, KindOf(title), progress end
+			-- Every quest the tooltip lists is done, yet the game says the mob still matters:
+			-- another quest needs it without showing in the tooltip (often a drop). Its name in
+			-- an unfinished objective of the quest log gives that quest's count.
+			local kind, logProgress = ObjectiveKindForName(UnitName(unit))
+			if kind then return true, kind, logProgress end
+			return false
 		end
 	end
 	local state, title, progress = ByTooltipInfo(unit)
-	if state ~= nil then return state, KindOf(title), progress end
+	if state == true then return true, KindOf(title), progress end
+	if state == false then
+		-- The tooltip's quests are done; another quest may still name this mob (see above).
+		local kind, logProgress = ObjectiveKindForName(UnitName(unit))
+		return kind ~= nil, kind, logProgress
+	end
 	local scanned, scannedTitle, scannedProgress = ByTooltipScan(unit)
 	if scanned then return true, KindOf(scannedTitle), scannedProgress end
 	-- Last resort, for clients whose tooltips show no quest lines: the mob's name in an

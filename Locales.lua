@@ -1253,3 +1253,16 @@ local news123 = {
 	itIT = "|cffffd200•|r Un pulsante |cffffd200Segnala un bug|r nella finestra delle opzioni.\n|cffffd200•|r |cff00ff00/cqi debug|r: un breve rapporto da copiare e inviare con la segnalazione, per correggere i problemi più in fretta.\n|cffffd200•|r Ogni versione ora viene controllata automaticamente prima di essere pubblicata.",
 }
 for code, text in pairs(news123) do locales[code].NEWS_TEXT = text end
+
+-- What's new 1.2.3: the two-quests-one-mob fix, first in the list.
+local multiFix = {
+	enUS = "Fix: a mob needed by two quests keeps its icon, with the right count, when one of them is done.",
+	ptBR = "Correção: um mob que serve para duas missões mantém o ícone, com a contagem certa, quando uma delas termina.",
+	esES = "Corrección: un enemigo que sirve para dos misiones mantiene su icono, con el contador correcto, cuando una termina.",
+	deDE = "Korrektur: Ein Gegner, den zwei Quests brauchen, behält sein Symbol mit dem richtigen Zähler, wenn eine davon fertig ist.",
+	frFR = "Correction : un monstre utile à deux quêtes garde son icône, avec le bon compteur, quand l'une d'elles est terminée.",
+	itIT = "Correzione: un nemico che serve a due missioni mantiene la sua icona, con il contatore giusto, quando una finisce.",
+}
+for code, text in pairs(multiFix) do
+	locales[code].NEWS_TEXT = "|cffffd200•|r " .. text .. "\n" .. locales[code].NEWS_TEXT
+end

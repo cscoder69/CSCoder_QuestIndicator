@@ -231,6 +231,30 @@ do
 	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then onForbidden = true end end
 	print("quest: forbidden plate left alone", not onForbidden)
 	profile.hideInInstances = true
+	rawset(mobPlate, "IsForbidden", nil)
+
+	-- Two quests, same mob: the tooltip lists only quest A, already done (3/3); quest B still
+	-- needs the mob (2/8) but isn't in the tooltip. The icon must show, with B's count.
+	env.C_TooltipInfo = { GetUnit = function()
+		return { lines = {
+			{ type = 17, leftText = "Quest A" },
+			{ type = 8, leftText = "Kobold Vermin slain: 3/3", completed = true },
+		} }
+	end }
+	env.C_QuestLog.GetNumQuestLogEntries = function() return 1 end
+	env.C_QuestLog.GetQuestIDForLogIndex = function() return 202 end
+	env.C_QuestLog.GetTitleForQuestID = function() return "Quest B" end
+	env.C_QuestLog.GetQuestObjectives = function() return { { text = "Kobold Vermin slain: 2/8", finished = false } } end
+	try("multiquest scan", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
+	try("multiquest plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
+	try("multiquest plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
+	local multiCount
+	for _, f in ipairs(frames) do
+		if rawget(f, "unit") == "nameplate1" and f._shown then multiCount = rawget(f, "progressValue") end
+	end
+	print("quest: second quest on the same mob shows", multiCount)
+	env.C_TooltipInfo = nil
+	env.C_QuestLog.GetNumQuestLogEntries = function() return 0 end
 	env.UnitExists = function() return false end
 	env.C_NamePlate.GetNamePlates = function() return {} end
 	env.C_NamePlate.GetNamePlateForUnit = function() return nil end
