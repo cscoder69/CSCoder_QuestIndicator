@@ -142,6 +142,11 @@ live in game after `/reload`.
   (issues URL), both in the copy window (`OpenShareWindow("copy", title, hint, text)`). Errors that
   mention the addon are kept in `root.lastErrors` (last 10) by a wrapper around the current error
   handler, which still receives every error.
+- **Two quests, one mob (v1.2.3 fix, user's tester plays with many quests):** when
+  `UnitIsRelatedToActiveQuest` says yes but the tooltip lists only finished quests, the mob is
+  marked anyway: with the count of an open objective that names it, or with no count. TO VERIFY in
+  game: a mob whose only quest is done (ready to turn in) must lose its icon; if it keeps it, the
+  API also counts finished quests and this fallback needs a stricter test.
 - **Badge experiment** (2026-11-09): built, tried in game, user found it ugly and dropped it; the
   commits were reverted. Do not bring it back unless asked (maybe with real artwork).
 - `/cqi` opens the options, `/cqi toggle` toggles the addon, `/cqi setup` the guide, `/cqi news` what's new, `/cqi plate` measures the target plate.

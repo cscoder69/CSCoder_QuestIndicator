@@ -362,7 +362,10 @@ local function IsQuestMob(unit)
 			-- an unfinished objective of the quest log gives that quest's count.
 			local kind, logProgress = ObjectiveKindForName(UnitName(unit))
 			if kind then return true, kind, logProgress end
-			return false
+			-- No objective names it (an item with another name): trust the game and mark the mob,
+			-- without a count. Players who collect many quests hit this often; a missing mark
+			-- is worse than a count we can't know.
+			return true, "normal", nil
 		end
 	end
 	local state, title, progress = ByTooltipInfo(unit)

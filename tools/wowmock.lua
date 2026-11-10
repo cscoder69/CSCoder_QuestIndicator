@@ -253,6 +253,15 @@ do
 		if rawget(f, "unit") == "nameplate1" and f._shown then multiCount = rawget(f, "progressValue") end
 	end
 	print("quest: second quest on the same mob shows", multiCount)
+
+	-- Same, but quest B asks for an item named nothing like the mob: still marked, no count.
+	env.C_QuestLog.GetQuestObjectives = function() return { { text = "Bundle of Hides: 1/5", finished = false } } end
+	try("multiquest scan 2", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
+	try("multiquest plate 2", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
+	try("multiquest plate 2", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
+	local marked = false
+	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then marked = true end end
+	print("quest: mob still marked when no objective names it", marked)
 	env.C_TooltipInfo = nil
 	env.C_QuestLog.GetNumQuestLogEntries = function() return 0 end
 	env.UnitExists = function() return false end
