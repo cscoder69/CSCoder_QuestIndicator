@@ -40,6 +40,7 @@ A floating, animated **"!"** over the mobs and items you still need for your que
 | `/cqi toggle` | Turns the addon on or off |
 | `/cqi setup` | Opens the setup guide again |
 | `/cqi news` | Shows what's new in this version |
+| `/cqi debug` | A short report to copy into a bug report |
 | `/cqi plate` | Measures your target's nameplate so the preview matches it |
 
 ## Notes

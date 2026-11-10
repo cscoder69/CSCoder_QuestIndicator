@@ -1,8 +1,14 @@
 package-as: CSCoder_QuestIndicator
 
+# The changes shown on CurseForge for each file.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
 ignore:
   - media
   - tools
   - README.md
   - CLAUDE.md
+  - CHANGELOG.md
   - .github

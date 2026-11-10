@@ -62,6 +62,12 @@ env.GetTime = function() return 12.5 end
 env.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
 env.print = function(...) end
 env.PlaySound = function() end
+env.GetBuildInfo = function() return "1.60.1", "12345", "Nov 1 2026", 16001 end
+env.date = os.date
+-- Error handlers: the addon wraps the current one to keep its own errors for /cqi debug.
+local gameHandled = 0
+env.geterrorhandler = function() return function() gameHandled = gameHandled + 1 end end
+env.seterrorhandler = function(fn) rawset(env, "_handler", fn) end
 env.C_Timer = { After = function(_, fn) fn() end }
 env.C_NamePlate = { GetNamePlates = function() return {} end, GetNamePlateForUnit = function() return nil end }
 env.C_QuestLog = { GetNumQuestLogEntries = function() return 0 end, GetInfo = function() return nil end, GetQuestObjectives = function() return {} end }
@@ -129,6 +135,15 @@ try("slash", env.SlashCmdList.CSCODERQUESTINDICATOR, "toggle")
 try("slash open", env.SlashCmdList.CSCODERQUESTINDICATOR, "")
 try("slash setup", env.SlashCmdList.CSCODERQUESTINDICATOR, "setup")
 try("slash news", env.SlashCmdList.CSCODERQUESTINDICATOR, "news")
+try("slash debug", env.SlashCmdList.CSCODERQUESTINDICATOR, "debug")
+-- An error from this addon is kept for /cqi debug and still reaches the game's handler.
+if rawget(env, "_handler") then
+	try("error handler", env._handler, "Interface/AddOns/CSCoder_QuestIndicator/CSCoder_QuestIndicator.lua:1: test error")
+	try("error handler", env._handler, "Interface/AddOns/OtherAddon/x.lua:1: not ours")
+	local kept = env.CSCoderQuestIndicatorDB.lastErrors or {}
+	print("errors kept for debug:", #kept, "| passed on to the game:", gameHandled)
+	try("slash debug with errors", env.SlashCmdList.CSCODERQUESTINDICATOR, "debug")
+end
 print("setup seen:", env.CSCoderQuestIndicatorDB.setupSeen["Tester - Realm"])
 
 -- /cqi plate on a fake target plate drawn at 0.8 distance scale: the saved size must be the

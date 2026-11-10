@@ -1217,3 +1217,39 @@ for code, texts in pairs(volume) do
 	l.SOUND_VOLUME, l.TIP_SOUND_VOLUME = texts[1], texts[2]
 	if l.NEWS_TEXT then l.NEWS_TEXT = l.NEWS_TEXT:gsub("\n\n", "\n|cffffd200•|r " .. texts[3] .. "\n\n", 1) end
 end
+
+-- /cqi debug and "Report a bug".
+local debugText = {
+	enUS = { DEBUG_TITLE = "Debug info", DEBUG_HINT = "Press Ctrl+C to copy this and send it with your bug report.",
+		BUG_BUTTON = "Report a bug", BUG_TITLE = "Report a bug",
+		BUG_HINT = "Copy this link (Ctrl+C) and open it in your browser. Type /cqi debug for the info to paste in your report." },
+	ptBR = { DEBUG_TITLE = "Informações de depuração", DEBUG_HINT = "Aperte Ctrl+C para copiar e mande junto com o relato do bug.",
+		BUG_BUTTON = "Reportar bug", BUG_TITLE = "Reportar um bug",
+		BUG_HINT = "Copie este link (Ctrl+C) e abra no navegador. Digite /cqi debug para pegar as informações e colar no relato." },
+	esES = { DEBUG_TITLE = "Información de depuración", DEBUG_HINT = "Pulsa Ctrl+C para copiar esto y envíalo con tu informe de error.",
+		BUG_BUTTON = "Informar error", BUG_TITLE = "Informar de un error",
+		BUG_HINT = "Copia este enlace (Ctrl+C) y ábrelo en tu navegador. Escribe /cqi debug para obtener la información que pegar en tu informe." },
+	deDE = { DEBUG_TITLE = "Debug-Infos", DEBUG_HINT = "Drücke Strg+C, um dies zu kopieren, und sende es mit deinem Fehlerbericht.",
+		BUG_BUTTON = "Fehler melden", BUG_TITLE = "Einen Fehler melden",
+		BUG_HINT = "Kopiere diesen Link (Strg+C) und öffne ihn im Browser. Gib /cqi debug ein, um die Infos für deinen Bericht zu bekommen." },
+	frFR = { DEBUG_TITLE = "Infos de débogage", DEBUG_HINT = "Appuyez sur Ctrl+C pour copier ceci et envoyez-le avec votre rapport de bug.",
+		BUG_BUTTON = "Signaler un bug", BUG_TITLE = "Signaler un bug",
+		BUG_HINT = "Copiez ce lien (Ctrl+C) et ouvrez-le dans votre navigateur. Tapez /cqi debug pour obtenir les infos à coller dans votre rapport." },
+	itIT = { DEBUG_TITLE = "Informazioni di debug", DEBUG_HINT = "Premi Ctrl+C per copiare e invialo con la tua segnalazione.",
+		BUG_BUTTON = "Segnala un bug", BUG_TITLE = "Segnala un bug",
+		BUG_HINT = "Copia questo link (Ctrl+C) e aprilo nel browser. Digita /cqi debug per le informazioni da incollare nella segnalazione." },
+}
+for code, keys in pairs(debugText) do
+	for k, v in pairs(keys) do locales[code][k] = v end
+end
+
+-- What's new (shown once after updating): v1.2.3.
+local news123 = {
+	enUS = "|cffffd200•|r A |cffffd200Report a bug|r button in the options window.\n|cffffd200•|r |cff00ff00/cqi debug|r: a short report to copy and send with a bug report, so problems get fixed faster.\n|cffffd200•|r Every release is now checked automatically before it is published.",
+	ptBR = "|cffffd200•|r Um botão |cffffd200Reportar bug|r na janela de opções.\n|cffffd200•|r |cff00ff00/cqi debug|r: um relatório curto para copiar e mandar junto com o relato do bug, para os problemas serem corrigidos mais rápido.\n|cffffd200•|r Cada versão agora é verificada automaticamente antes de ser publicada.",
+	esES = "|cffffd200•|r Un botón |cffffd200Informar error|r en la ventana de opciones.\n|cffffd200•|r |cff00ff00/cqi debug|r: un informe corto para copiar y enviar con tu informe de error, para corregir los problemas antes.\n|cffffd200•|r Cada versión se comprueba ahora automáticamente antes de publicarse.",
+	deDE = "|cffffd200•|r Ein Knopf |cffffd200Fehler melden|r im Optionsfenster.\n|cffffd200•|r |cff00ff00/cqi debug|r: ein kurzer Bericht zum Kopieren für deine Fehlermeldung, damit Probleme schneller behoben werden.\n|cffffd200•|r Jede Version wird jetzt vor der Veröffentlichung automatisch geprüft.",
+	frFR = "|cffffd200•|r Un bouton |cffffd200Signaler un bug|r dans la fenêtre d'options.\n|cffffd200•|r |cff00ff00/cqi debug|r : un court rapport à copier et à joindre à votre signalement, pour corriger les problèmes plus vite.\n|cffffd200•|r Chaque version est maintenant vérifiée automatiquement avant d'être publiée.",
+	itIT = "|cffffd200•|r Un pulsante |cffffd200Segnala un bug|r nella finestra delle opzioni.\n|cffffd200•|r |cff00ff00/cqi debug|r: un breve rapporto da copiare e inviare con la segnalazione, per correggere i problemi più in fretta.\n|cffffd200•|r Ogni versione ora viene controllata automaticamente prima di essere pubblicata.",
+}
+for code, text in pairs(news123) do locales[code].NEWS_TEXT = text end

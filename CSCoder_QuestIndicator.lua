@@ -1924,7 +1924,7 @@ function UpdateMinimapButton()
 	end
 end
 
-local BuildPanel, ShowWizard, ShowNews
+local BuildPanel, ShowWizard, ShowNews, ShowDebug
 do -- the options window, its sections, the setup guide and what's new (one block: the main
    -- chunk would pass Lua's 200-locals limit)
 ---------------------------------------------------------------------------------------------
@@ -2270,17 +2270,72 @@ do
 	end
 
 	-- mode: "export" (text ready to copy) or "import" (paste and press Import).
-	function OpenShareWindow(mode)
+	-- mode: "export" (text ready to copy), "import" (paste and press Import), or "copy" with a
+	-- title, a hint and the text to copy (debug report, bug link).
+	function OpenShareWindow(mode, copyTitle, copyHint, copyText)
 		if not window then Build() end
-		local exporting = mode == "export"
-		title:SetText(exporting and L.SHARE_EXPORT_TITLE or L.SHARE_IMPORT_TITLE)
-		hint:SetText(exporting and L.SHARE_EXPORT_HINT or string.format(L.SHARE_IMPORT_HINT, tostring(ActiveProfileName())))
-		action:SetShown(not exporting)
+		local copying = mode ~= "import"
+		if mode == "copy" then
+			title:SetText(copyTitle)
+			hint:SetText(copyHint)
+		else
+			title:SetText(mode == "export" and L.SHARE_EXPORT_TITLE or L.SHARE_IMPORT_TITLE)
+			hint:SetText(mode == "export" and L.SHARE_EXPORT_HINT or string.format(L.SHARE_IMPORT_HINT, tostring(ActiveProfileName())))
+		end
+		action:SetShown(not copying)
 		window:Show()
-		input:SetText(exporting and Export() or "")
+		input:SetText((mode == "copy" and copyText) or (mode == "export" and Export()) or "")
 		input:SetFocus()
-		if exporting then input:HighlightText() end
+		if copying then
+			input:SetCursorPosition(0)
+			input:HighlightText()
+		end
 	end
+end
+
+-- /cqi debug: one line with what helps to find a problem (versions, client, language, the
+-- profile's main switches, the place, other quest/nameplate addons, the last errors of this
+-- addon), shown ready to copy.
+local BUG_URL = "https://github.com/cscoder69/CSCoder_QuestIndicator/issues"
+function ShowDebug()
+	local parts = {}
+	local function Add(label, value) parts[#parts + 1] = label .. "=" .. tostring(value) end
+	Add("addon", AddonVersion())
+	if GetBuildInfo then
+		local version, build, _, toc = GetBuildInfo()
+		Add("client", tostring(version) .. "." .. tostring(build) .. " (" .. tostring(toc) .. ")")
+	end
+	Add("locale", GetLocale and GetLocale())
+	Add("language", root.language)
+	Add("profile", ActiveProfileName())
+	for _, key in ipairs({ "active", "enabled", "objects", "progress", "objectProgress", "hideInInstances", "sound", "soundVolume", "style", "anchor" }) do
+		Add(key, db[key])
+	end
+	if IsInInstance then
+		local inside, kind = IsInInstance()
+		Add("instance", inside and tostring(kind) or "no")
+	end
+	if C_CVar and C_CVar.GetCVar then
+		Add("enemyPlates", C_CVar.GetCVar("nameplateShowEnemies"))
+		Add("softInteract", C_CVar.GetCVar("SoftTargetInteract"))
+	end
+	local plate = root.plateGeom
+	Add("plate", plate and string.format("%.0fx%.0f", plate.w or 0, plate.h or 0) or "none")
+	local others = {}
+	local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+	for _, name in ipairs({ "ForeverLootSparkles", "Questie", "Plater", "TidyPlates", "Kui_Nameplates", "ElvUI", "OneForAll", "pfQuest" }) do
+		if isLoaded and isLoaded(name) then others[#others + 1] = name end
+	end
+	Add("addons", #others > 0 and table.concat(others, ",") or "none")
+	local errors = root.lastErrors or {}
+	Add("errors", #errors)
+	for i = #errors, math.max(1, #errors - 2), -1 do parts[#parts + 1] = "err" .. i .. "=" .. errors[i] end
+	OpenShareWindow("copy", L.DEBUG_TITLE, L.DEBUG_HINT, "CQI-DEBUG " .. table.concat(parts, " | "))
+end
+
+-- "Report a bug": the issues page, ready to copy.
+local function ShowBugLink()
+	OpenShareWindow("copy", L.BUG_TITLE, L.BUG_HINT, BUG_URL)
 end
 
 local function BuildProfilesTab(tab)
@@ -2545,6 +2600,11 @@ function BuildPanel()
 	toggle:SetSize(110, 22)
 	toggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -50, -18)
 	Loc(toggle, "PREVIEW")
+	local bug = Skin.Button(panel)
+	bug:SetSize(130, 22)
+	bug:SetPoint("TOPRIGHT", toggle, "BOTTOMRIGHT", 0, -6)
+	Loc(bug, "BUG_BUTTON")
+	bug:SetScript("OnClick", ShowBugLink)
 	toggle:SetScript("OnClick", function()
 		if window:IsShown() then
 			root.previewHidden = true
@@ -3002,6 +3062,18 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		LoadSavedVariables()
 		L = BuildLocale(root.language)
 		BuildPanel()
+		if geterrorhandler and seterrorhandler then
+			local previous = geterrorhandler()
+			seterrorhandler(function(message, ...)
+				if type(message) == "string" and message:find(ADDON, 1, true) then
+					root.lastErrors = root.lastErrors or {}
+					local line = (date and date("%H:%M ") or "") .. message:gsub("[\r\n|]+", " "):sub(1, 300)
+					table.insert(root.lastErrors, line)
+					while #root.lastErrors > 10 do table.remove(root.lastErrors, 1) end
+				end
+				if previous then return previous(message, ...) end
+			end)
+		end
 		return
 	end
 	if not db then return end
@@ -3091,6 +3163,8 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 		ShowWizard()
 	elseif cmd == "news" then
 		ShowNews()
+	elseif cmd == "debug" then
+		ShowDebug()
 	elseif cmd == "plate" then
 		-- Measures the target's nameplate for the preview and prints what was found.
 		-- Protected: an error here would leave the text stuck in the chat box.

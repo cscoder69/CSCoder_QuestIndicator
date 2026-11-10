@@ -40,6 +40,7 @@ A floating "!" over every quest mob and item you still need, with live progress 
 | `/cqi toggle` | Turns the addon on or off |
 | `/cqi setup` | Opens the setup guide again |
 | `/cqi news` | Shows what's new in this version |
+| `/cqi debug` | A short report to copy into a bug report |
 
 ### Notes
 

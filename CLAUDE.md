@@ -137,6 +137,11 @@ live in game after `/reload`.
   game closed meanwhile). At 100% it plays on Master.
 - **Hide in instanced content** (`hideInInstances`, on by default; the user's tester got errors in
   dungeons). `UsablePlate(unit)` never returns forbidden plates; plates are measured outside instances only.
+- **Bug reports (v1.2.3):** `/cqi debug` (`ShowDebug`: versions, client, language, main switches,
+  instance, plate cvars, other quest/nameplate addons, last errors) and a "Report a bug" button
+  (issues URL), both in the copy window (`OpenShareWindow("copy", title, hint, text)`). Errors that
+  mention the addon are kept in `root.lastErrors` (last 10) by a wrapper around the current error
+  handler, which still receives every error.
 - **Badge experiment** (2026-11-09): built, tried in game, user found it ugly and dropped it; the
   commits were reverted. Do not bring it back unless asked (maybe with real artwork).
 - `/cqi` opens the options, `/cqi toggle` toggles the addon, `/cqi setup` the guide, `/cqi news` what's new, `/cqi plate` measures the target plate.
@@ -160,6 +165,11 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
   Keep CurseForge's own "Automatic Packaging" **off** (the GitHub Action does it; both would double-upload).
 - **Version numbers (user, 2026-11-09):** bump only the third digit for now (v1.2.1, v1.2.2, ...);
   the minor number was going up too fast.
+- **Every release, before tagging:** add the version's section at the top of `CHANGELOG.md` (the
+  packager uploads it as the file's changelog, `.pkgmeta` manual-changelog) and update `NEWS_TEXT`
+  in all 6 languages. The workflow's `check` job (syntax, both mock runs, `tools/check_translations.lua`)
+  must pass or nothing is uploaded; it can be run by hand with
+  `gh workflow run "Package and release" --ref <branch>` (the release job only runs on tags).
 - Commits publish nothing. To release: bump nothing by hand, just
   `git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`, then `gh run watch` the "Package and release" run.
   New files go through CurseForge moderation.
