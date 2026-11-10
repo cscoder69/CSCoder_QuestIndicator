@@ -809,3 +809,22 @@ local wizardText = {
 for code, keys in pairs(wizardText) do
 	for k, v in pairs(keys) do locales[code][k] = v end
 end
+
+-- Objective-complete sounds (the menu was rebuilt from sounds picked by ear in game).
+local soundNames = {
+	enUS = { SOUND_coins = "Coins", SOUND_auction = "Auction house (open)", SOUND_auctionclose = "Auction house (close)",
+		SOUND_worldquest = "World quest complete", SOUND_bell = "Bell" },
+	ptBR = { SOUND_coins = "Moedas", SOUND_auction = "Casa de leilões (abrir)", SOUND_auctionclose = "Casa de leilões (fechar)",
+		SOUND_worldquest = "Missão mundial concluída", SOUND_bell = "Sino" },
+	esES = { SOUND_coins = "Monedas", SOUND_auction = "Casa de subastas (abrir)", SOUND_auctionclose = "Casa de subastas (cerrar)",
+		SOUND_worldquest = "Misión de mundo completada", SOUND_bell = "Campana" },
+	deDE = { SOUND_coins = "Münzen", SOUND_auction = "Auktionshaus (öffnen)", SOUND_auctionclose = "Auktionshaus (schließen)",
+		SOUND_worldquest = "Weltquest abgeschlossen", SOUND_bell = "Glocke" },
+	frFR = { SOUND_coins = "Pièces", SOUND_auction = "Hôtel des ventes (ouvrir)", SOUND_auctionclose = "Hôtel des ventes (fermer)",
+		SOUND_worldquest = "Expédition terminée", SOUND_bell = "Cloche" },
+	itIT = { SOUND_coins = "Monete", SOUND_auction = "Casa d'aste (apri)", SOUND_auctionclose = "Casa d'aste (chiudi)",
+		SOUND_worldquest = "Missione mondiale completata", SOUND_bell = "Campana" },
+}
+for code, keys in pairs(soundNames) do
+	for k, v in pairs(keys) do locales[code][k] = v end
+end

@@ -45,7 +45,7 @@ local DEFAULTS = {
 	minimap = true,      -- minimap button
 	minimapAngle = 220,  -- its position around the minimap (degrees)
 	sound = true,        -- play a sound when a quest objective completes
-	soundChoice = "quest", -- key in QUEST_SOUNDS
+	soundChoice = "coins", -- key in QUEST_SOUNDS
 }
 -- Saved layout: CSCoderQuestIndicatorDB = { version, language, profiles = { name = settings },
 -- chars = { "Name - Realm" = profile name }, savedCVars }.
@@ -587,37 +587,14 @@ end
 local objectiveTexts = {} -- { text = lower case objective, kind = quest kind }
 local objectiveStates = {} -- questID -> { [objective index] = finished }, to hear one complete
 
--- Sounds for "objective complete": sound kit IDs that every client has.
-local QUEST_SOUNDS = { quest = 878, ping = 3175, ready = 8960, warning = 8959, levelup = 888 }
-local QUEST_SOUND_ORDER = { "quest", "ping", "ready", "warning", "levelup" }
+-- Sounds for "objective complete" (sound kit IDs), picked by ear in game on 2026-11-09 from a
+-- longer list. The old choices (ping, ready, warning, level up) fall back to the default.
+local QUEST_SOUNDS = { coins = 120, auction = 5274, auctionclose = 1204, worldquest = 44295, bell = 6674, quest = 878 }
+local QUEST_SOUND_ORDER = { "coins", "auction", "auctionclose", "worldquest", "bell", "quest" }
 
 local function PlayQuestSound()
-	local id = QUEST_SOUNDS[db.soundChoice] or QUEST_SOUNDS.quest
+	local id = QUEST_SOUNDS[db.soundChoice] or QUEST_SOUNDS[DEFAULTS.soundChoice]
 	if PlaySound then pcall(PlaySound, id, "Master") end
-end
-
--- TEMPORARY: /cqi sound plays candidate sounds one by one, to pick a better list for the menu
--- (some may not exist on this client and stay silent). Remove once the list is chosen.
-local SoundAudition
-do
-	local candidates = {
-		{ 878, "Quest complete" }, { 875, "Quest log open" }, { 847, "Quest failed" }, { 888, "Level up" },
-		{ 8960, "Ready check" }, { 8959, "Raid warning" }, { 3175, "Map ping" }, { 3081, "Whisper" },
-		{ 12867, "Alarm clock 2" }, { 12889, "Alarm clock 3" }, { 416, "Murloc" }, { 120, "Coins" },
-		{ 5274, "Auction house open" }, { 8458, "PvP queue" }, { 8459, "PvP queue ready" }, { 880, "Group invite" },
-		{ 18019, "Battle.net toast" }, { 31578, "Epic loot toast" }, { 44295, "World quest complete" },
-		{ 23404, "Dig site complete" }, { 12891, "Achievement" }, { 3337, "Mail" }, { 1204, "Auction close" },
-		{ 6674, "Bell toll" },
-	}
-	local index = 0
-	function SoundAudition(arg)
-		index = tonumber(arg) or (index % #candidates + 1)
-		local c = candidates[index]
-		if not c then return end
-		if PlaySound then pcall(PlaySound, c[1], "Master") end
-		print(string.format("|cffffd200%s|r sound %d/%d: %s (%d). Type /cqi sound for the next one, or /cqi sound <number>.",
-			TITLE, index, #candidates, c[2], c[1]))
-	end
 end
 
 local function RebuildObjectiveTexts()
@@ -769,6 +746,7 @@ local function FillDefaults(profile)
 	profile.cursor = nil -- removed option
 	profile.style = OLD_STYLES[profile.style] or profile.style
 	if not VALID_STYLE[profile.style] then profile.style = DEFAULT_STYLE end
+	if not QUEST_SOUNDS[profile.soundChoice] then profile.soundChoice = DEFAULTS.soundChoice end
 	for _, key in ipairs({ "anchor", "objectAnchor" }) do
 		if not ICON_ANCHORS[profile[key]] then profile[key] = "top" end
 	end
@@ -2434,8 +2412,6 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 		ApplySettings()
 		RefreshControls()
 		print("|cffffd200" .. TITLE .. "|r " .. (db.active and L.ON or L.OFF))
-	elseif cmd == "sound" then
-		SoundAudition((msg or ""):match("^%S+%s+(%d+)"))
 	elseif cmd == "setup" then
 		ShowWizard()
 	elseif cmd == "plate" then
