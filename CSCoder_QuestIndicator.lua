@@ -1207,7 +1207,7 @@ local function AddCheck(parent, labelKey, tipKey, settingKey, x, y)
 	local function Sync() check:SetChecked(db[settingKey]) end
 	refreshers[#refreshers + 1] = Sync
 	check:SetScript("OnShow", Sync)
-	check:SetScript("OnClick", function(self)
+	check:HookScript("OnClick", function(self) -- (Hook: the switch repaints on click too)
 		db[settingKey] = self:GetChecked() and true or false
 		ApplySettings()
 	end)
