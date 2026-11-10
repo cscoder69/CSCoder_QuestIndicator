@@ -181,6 +181,14 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
   and volume, hide in instanced content (default on), forbidden-plate safety.
 
 ## Ideas the user liked, not done yet
+- **Ideas reviewed with the user on 2026-11-09 (after v1.2.2):**
+  - Next candidate (user: "interessante"): **quest item button**: when you target the mob a quest
+    item must be used on, a small button with that item appears (secure action button: combat rules).
+  - Future: arrow to the nearest quest mob (own branch, test apart), custom icon colour +
+    transparency, show only on target/mouseover, party members' quest mobs (needs the addon on
+    their side), colour-blind palette, session stats (`/cqi stats`, "useless but fun"), limit the
+    number of icons in crowded areas.
+  - CurseForge page (GIF, screenshots of the new window, better description): still to do.
 - ~~Separate look for mobs vs items~~ DONE in v1.2.1 (`objectOwnLook`).
 - **Badges** (like ItemTree's "Keep 12" pill): a floating, draggable tracker of objective badges
   ("Timberling Sprouts 8/12"), or a badge with progress above the mob.
