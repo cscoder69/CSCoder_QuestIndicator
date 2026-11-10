@@ -8,6 +8,9 @@ local function newObject(kind)
 	frames[#frames + 1] = o
 	return setmetatable(o, { __index = function(_, k)
 		if k == "Text" or k == "text" then return nil end
+		-- Fields (lower case: f.progressValue, f.completing...) are nil until set, as in the game;
+		-- only methods (upper case) are faked.
+		if k:match("^%l") or k == "UnitFrame" then return nil end
 		return function(self, ...)
 			local a = { ... }
 			if k == "SetScript" then self._scripts[a[1]] = a[2]
@@ -139,6 +142,58 @@ try("slash plate", env.SlashCmdList.CSCODERQUESTINDICATOR, "plate")
 local g = env.CSCoderQuestIndicatorDB.plateGeom or {}
 print("plate:", g.w, g.h, "base scale", g.eff, "bar", g.barW, g.barH, "top", g.barTop)
 env.UnitExists = function() return false end
+
+-- Quest log: one quest whose last objective finishes between two scans -> the sound plays, the
+-- quest is announced as ready, and the summary lists open objectives only.
+do
+	local finished = false
+	env.C_QuestLog.GetNumQuestLogEntries = function() return 1 end
+	env.C_QuestLog.GetQuestIDForLogIndex = function() return 101 end
+	env.C_QuestLog.GetTitleForQuestID = function() return "The Kobold Threat" end
+	env.C_QuestLog.GetQuestObjectives = function()
+		return { { text = "Kobold Vermin slain: " .. (finished and "10/10" or "9/10"), finished = finished } }
+	end
+	local saved = env.CSCoderQuestIndicatorDB
+	local profile = saved.profiles[saved.chars["Tester - Realm"]]
+	profile.active, profile.sound, profile.readyAlert = true, true, true -- "/cqi toggle" above turned it off
+	local printed, sounds = {}, 0
+	env.print = function(text) printed[#printed + 1] = tostring(text) end
+	env.PlaySound = function() sounds = sounds + 1 end
+	try("quest scan 1", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
+	local summary = 0
+	finished = true
+	try("quest scan 2", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
+	local ready = false
+	for _, line in ipairs(printed) do if line:find("The Kobold Threat", 1, true) then ready = true end end
+	print("quest: sound played", sounds > 0, "| ready announced", ready)
+
+	-- A quest mob on a nameplate: needed (icon), then not needed right after the objective
+	-- finished -> its icon turns into the check mark instead of vanishing.
+	local related = true
+	local mobPlate = newObject("NamePlate")
+	mobPlate.namePlateUnitToken = "nameplate1"
+	env.UnitExists = function() return true end
+	env.UnitIsPlayer = function() return false end
+	env.UnitIsDead = function() return false end
+	env.UnitIsFriend = function() return false end
+	env.UnitCanAttack = function() return true end
+	env.UnitName = function() return "Kobold Vermin" end
+	env.C_QuestLog.UnitIsRelatedToActiveQuest = function() return related end
+	env.C_NamePlate.GetNamePlates = function() return { mobPlate } end
+	env.C_NamePlate.GetNamePlateForUnit = function(unit) return unit == "nameplate1" and mobPlate or nil end
+	try("plate added", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
+	related = false
+	try("refresh after done", eventFrame._scripts.OnUpdate, eventFrame, 2)
+	local completing = false
+	for _, f in ipairs(frames) do if rawget(f, "completing") then completing = true end end
+	print("quest: check mark shown", completing)
+	env.UnitExists = function() return false end
+	env.C_NamePlate.GetNamePlates = function() return {} end
+	env.C_NamePlate.GetNamePlateForUnit = function() return nil end
+	env.print = function() end
+	env.PlaySound = function() end
+	env.C_QuestLog.GetNumQuestLogEntries = function() return 0 end
+end
 
 local db = env.CSCoderQuestIndicatorDB
 local names = {}

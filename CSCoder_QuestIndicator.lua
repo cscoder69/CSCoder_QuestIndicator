@@ -34,6 +34,7 @@ local DEFAULTS = {
 	progressColor = "white",   -- "white", "gold", "green", "kind" (same colour as the icon) or "progress" (red to green)
 	progressFormat = "slash",  -- "slash" 8/12, "spaced" 8 / 12, "both" 8/12 (67%), "percent" 67%, "left" 4 left
 	progressShadow = false,   -- drop shadow behind the text
+	progressPulse = true,     -- the count pulses when it goes up and turns gold with one left
 	progressX = 36,      -- its X
 	progressY = 0,       -- its Y
 	bounce = true,       -- floating up/down animation
@@ -50,6 +51,9 @@ local DEFAULTS = {
 	minimap = true,      -- minimap button
 	minimapAngle = 220,  -- its position around the minimap (degrees)
 	sound = true,        -- play a sound when a quest objective completes
+	doneCheck = true,    -- an icon that stops being needed turns into a check mark, then fades
+	readyAlert = true,   -- chat line when every objective of a quest is done
+	minimapSummary = true, -- the minimap button's tooltip lists the open objectives
 	soundChoice = "coins", -- key in QUEST_SOUNDS
 }
 -- Saved layout: CSCoderQuestIndicatorDB = { version, language, profiles = { name = settings },
@@ -324,6 +328,10 @@ end
 
 -- Unfinished objectives from the quest log, rebuilt on QUEST_LOG_UPDATE.
 local objectiveTexts = {} -- { text = lower case objective, kind = quest kind }
+-- What the last quest log scan found: unfinished objectives per quest (the minimap tooltip
+-- summary) and when an objective last finished (icons that stop being needed right after show
+-- the check mark).
+local questLog = { summary = {}, completedAt = -100 }
 
 -- A name found in an unfinished objective ("Kobold Vermin slain: 3/10", "Crate of Supplies:
 -- 1/4"): its quest kind and progress.
@@ -441,6 +449,11 @@ local function StyleIcon(f)
 			color = ProgressColor(fraction)
 		end
 		color = color or TEXT_COLORS.white
+		-- One left: gold, whatever the colour setting (with "Animate the count").
+		if db.progressPulse then
+			local have, need = tostring(f.progressValue):match("(%d+)%s*/%s*(%d+)")
+			if have and tonumber(need) - tonumber(have) == 1 then color = TEXT_COLORS.gold end
+		end
 		label:SetTextColor(color[1], color[2], color[3])
 		label:SetText(shown)
 		text:SetScale(1 / scale)
@@ -537,6 +550,33 @@ local function CreateIcon()
 	grow:SetDuration(0.18)
 	grow:SetSmoothing("OUT")
 	f.pop = pop
+
+	-- Done: the check mark swells a little and fades out; then the icon goes back to the pool.
+	local done = f:CreateAnimationGroup()
+	local swell = done:CreateAnimation("Scale")
+	swell:SetScaleFrom(1, 1)
+	swell:SetScaleTo(1.35, 1.35)
+	swell:SetDuration(0.25)
+	swell:SetSmoothing("OUT")
+	local fadeOut = done:CreateAnimation("Alpha")
+	fadeOut:SetFromAlpha(1)
+	fadeOut:SetToAlpha(0)
+	fadeOut:SetStartDelay(0.6)
+	fadeOut:SetDuration(0.5)
+	done:SetScript("OnFinished", function() if f.onDone then f.onDone(f) end end)
+	f.done = done
+
+	-- The count's pulse when it goes up: out to 1.4x and back.
+	local textPop = text:CreateAnimationGroup()
+	local out = textPop:CreateAnimation("Scale")
+	out:SetScale(1.4, 1.4)
+	out:SetDuration(0.12)
+	out:SetOrder(1)
+	local back = textPop:CreateAnimation("Scale")
+	back:SetScale(1 / 1.4, 1 / 1.4)
+	back:SetDuration(0.18)
+	back:SetOrder(2)
+	f.textPop = textPop
 	return f
 end
 
@@ -544,9 +584,16 @@ local function ShowIcon(unit, plate, kind, progress)
 	kind = kind or "normal"
 	local f = icons[unit]
 	if f then
+		if f.completing then return end
 		if f.kind ~= kind or f.progressValue ~= progress then
+			local before = tonumber(tostring(f.progressValue):match("%d+"))
+			local now = tonumber(tostring(progress):match("%d+"))
 			f.kind, f.progressValue = kind, progress
 			StyleIcon(f)
+			if db.progressPulse and before and now and now > before and f.text:IsShown() then
+				f.textPop:Stop()
+				f.textPop:Play()
+			end
 		end
 		return
 	end
@@ -566,11 +613,32 @@ local function HideIcon(unit)
 	if not f then return end
 	icons[unit] = nil
 	f.pulse:Stop()
+	f.done:Stop()
+	f.completing, f.onDone = nil, nil
 	f:Hide()
 	f:SetParent(UIParent)
 	f.unit, f.progressValue = nil, nil
 	f.text:Hide()
 	table.insert(pool, f)
+end
+
+-- An icon that stops being needed right after an objective finished turns into a green check
+-- mark, then fades; otherwise it just goes.
+local function HideOrComplete(unit)
+	local f = icons[unit]
+	if not f or f.completing then return end
+	if not (db.doneCheck and GetTime() - questLog.completedAt < 3) then -- 3 s after an objective finished
+		HideIcon(unit)
+		return
+	end
+	f.completing = true
+	f.icon:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+	f.icon:SetVertexColor(1, 1, 1)
+	f.glow:SetVertexColor(0.3, 1, 0.3, 0.9)
+	f.glow:Show()
+	f.text:Hide()
+	f.onDone = function(self) if icons[unit] == self then HideIcon(unit) end end
+	f.done:Play()
 end
 
 local function UpdateCombatAlpha()
@@ -583,6 +651,7 @@ local function Refresh(unit)
 	if db.active and db.enabled and plate then
 		local needed, kind, progress = IsQuestMob(unit)
 		if needed then ShowIcon(unit, plate, kind, progress) return end
+		if not UnitIsDead(unit) then HideOrComplete(unit) return end
 	end
 	HideIcon(unit)
 end
@@ -628,12 +697,25 @@ local function PlayQuestSound()
 	if PlaySound then pcall(PlaySound, id, "Master") end
 end
 
-local function RebuildObjectiveTexts()
+local RebuildObjectiveTexts
+do -- (own block: the main chunk is near Lua's 200-locals limit)
+local function QuestTitle(questID, logIndex)
+	local title = C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(questID)
+	if not title and C_QuestLog.GetInfo then
+		local info = C_QuestLog.GetInfo(logIndex)
+		title = info and info.title
+	end
+	if not title and GetQuestLogTitle then title = GetQuestLogTitle(logIndex) end
+	return title or "?"
+end
+
+function RebuildObjectiveTexts()
 	wipe(objectiveTexts)
 	if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then return end
 	-- An objective that was unfinished on the last scan and is finished now plays the sound
-	-- (once per scan). Quests seen for the first time (login, just accepted) stay silent.
-	local states, completed = {}, false
+	-- (once per scan); a quest whose last objective just finished is announced as ready.
+	-- Quests seen for the first time (login, just accepted) stay silent.
+	local states, completed, ready, summary = {}, false, {}, {}
 	local count = (C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetNumQuestLogEntries()) or 0
 	for i = 1, count do
 		local questID = C_QuestLog.GetQuestIDForLogIndex and C_QuestLog.GetQuestIDForLogIndex(i)
@@ -642,19 +724,37 @@ local function RebuildObjectiveTexts()
 			questID = info and not info.isHeader and info.questID
 		end
 		local objectives = questID and C_QuestLog.GetQuestObjectives(questID)
+		local before = objectiveStates[questID]
+		local allDone, wasAllDone, open = #(objectives or {}) > 0, true, nil
 		for index, objective in ipairs(objectives or {}) do
-			if objective.text and not objective.finished then
-				objectiveTexts[#objectiveTexts + 1] = { text = objective.text:lower(), kind = kindByQuestID[questID] or "normal" }
-			end
 			local finished = objective.finished and true or false
+			if objective.text and not finished then
+				objectiveTexts[#objectiveTexts + 1] = { text = objective.text:lower(), kind = kindByQuestID[questID] or "normal" }
+				open = open or {}
+				open[#open + 1] = objective.text
+			end
 			states[questID] = states[questID] or {}
 			states[questID][index] = finished
-			local before = objectiveStates[questID] and objectiveStates[questID][index]
-			if finished and before == false then completed = true end
+			if not finished then allDone = false end
+			if before and before[index] == false then
+				wasAllDone = false
+				if finished then completed = true end
+			end
 		end
+		if open then summary[#summary + 1] = { title = QuestTitle(questID, i), lines = open } end
+		if before and allDone and not wasAllDone then ready[#ready + 1] = QuestTitle(questID, i) end
 	end
 	objectiveStates = states
-	if completed and db.active and db.sound then PlayQuestSound() end
+	questLog.summary = summary
+	if completed then questLog.completedAt = GetTime() end
+	if not db.active then return end
+	if completed and db.sound then PlayQuestSound() end
+	if db.readyAlert then
+		for _, title in ipairs(ready) do
+			print(string.format("|cffffd200%s|r " .. L.READY_TO_TURN_IN, TITLE, "|cff00ff00" .. title .. "|r"))
+		end
+	end
+end
 end
 
 -- Returns: still needed?, quest kind, progress text.
@@ -1073,7 +1173,7 @@ local DROPDOWN_MAX_ROWS = 16 -- longer lists wrap into more columns
 local openList -- the dropdown list currently open, if any
 local dropdownHost -- window that holds new dropdown lists (default: the options panel)
 
-local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, width, fontFor)
+local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, width, fontFor, preview)
 	width = width or 240
 	local heading = AddHeading(parent, labelKey, x, y)
 	local backdrop = BackdropTemplateMixin and "BackdropTemplate" or nil
@@ -1124,6 +1224,17 @@ local function AddDropdown(parent, labelKey, options, labelFor, get, set, x, y, 
 		row.text:SetPoint("RIGHT", -4, 0)
 		row.text:SetJustifyH("LEFT")
 		row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		-- preview(option), when given, adds a play button to each row (the sound menu).
+		if preview then
+			row.text:SetPoint("RIGHT", -22, 0)
+			local play = CreateFrame("Button", nil, row)
+			play:SetSize(16, 16)
+			play:SetPoint("RIGHT", -2, 0)
+			play:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up")
+			play:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Down")
+			play:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+			play:SetScript("OnClick", function() preview(row.option) end)
+		end
 		row:SetScript("OnClick", function(self)
 			list:Hide()
 			set(self.option)
@@ -1558,6 +1669,19 @@ local function CreateMinimapButton()
 		GameTooltip:AddLine(L.TIP_LEFT, 1, 1, 1)
 		GameTooltip:AddLine(L.TIP_RIGHT, 1, 1, 1)
 		GameTooltip:AddLine(L.TIP_DRAG, 0.7, 0.7, 0.7)
+		-- What's left, per quest (up to 8 quests).
+		if db.minimapSummary and #questLog.summary > 0 then
+			GameTooltip:AddLine(" ")
+			GameTooltip:AddLine(L.SUMMARY_TITLE, 1, 0.82, 0)
+			for i, quest in ipairs(questLog.summary) do
+				if i > 8 then
+					GameTooltip:AddLine(string.format(L.SUMMARY_MORE, #questLog.summary - 8), 0.7, 0.7, 0.7)
+					break
+				end
+				GameTooltip:AddLine(quest.title, 1, 0.82, 0)
+				for _, line in ipairs(quest.lines) do GameTooltip:AddLine("   " .. line, 1, 1, 1) end
+			end
+		end
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1590,9 +1714,10 @@ local DISPLAY_KEYS = { "active", "enabled", "objects", "anchor", "scale", "offse
 	"objectAnchor", "objectScale", "objectOffsetX", "objectOffset" }
 local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "glowAlpha",
 	"objectOwnLook", "objectStyle", "objectBounce", "objectGlow" }
-local PROGRESS_KEYS = { "progress", "objectProgress", "progressAttach", "progressFloat", "progressSize", "progressFont",
+local PROGRESS_KEYS = { "progress", "objectProgress", "progressPulse", "progressAttach", "progressFloat", "progressSize", "progressFont",
 	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressX", "progressY" }
-local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice" }
+local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice",
+	"doneCheck", "readyAlert", "minimapSummary" }
 
 local function ResetKeys(keys)
 	for _, key in ipairs(keys) do db[key] = DEFAULTS[key] end
@@ -1699,6 +1824,7 @@ local function BuildProgressTab(tab)
 		function(value) return L["COLOR_" .. value] end, Choice("progressColor"), SetChoice("progressColor"),
 		COL2 + 4, TOP - 162, COLUMN_DROPDOWN))
 	GateCheck(ProgressOn, AddCheck(tab, "TEXT_SHADOW", "TEXT_SHADOW_TIP", "progressShadow", COL1, TOP - 244))
+	GateCheck(ProgressOn, AddCheck(tab, "PROGRESS_PULSE", "PROGRESS_PULSE_TIP", "progressPulse", COL2, TOP - 244))
 
 	-- Attached, the text is glued to the icon: X/Y only apply when it stands on its own.
 	local function FreeTextOn() return ProgressOn() and not db.progressAttach end
@@ -1707,9 +1833,22 @@ local function BuildProgressTab(tab)
 end
 
 local function BuildIconTab(tab)
+	-- Quick themes: one click sets size, float, glow and text size (the icon itself stays).
+	local THEMES = {
+	classic = { scale = 1.5, objectScale = 1.5, bounce = true, bounceHeight = 7, bounceSpeed = 0.9, glow = false, glowAlpha = 0.55, progressSize = 13 },
+	subtle = { scale = 1.0, objectScale = 1.0, bounce = false, glow = false, progressSize = 11 },
+	flashy = { scale = 2.0, objectScale = 2.0, bounce = true, bounceHeight = 12, bounceSpeed = 0.7, glow = true, glowAlpha = 0.85, progressSize = 15 },
+}
+	local THEME_ORDER = { "classic", "subtle", "flashy" }
 	AddResetTabButton(tab, function() ResetKeys(ICON_KEYS) end)
 	Gate(AnyIconOn, AddHeading(tab, "ICON_STYLE", COL1, TOP))
 	Gate(AnyIconOn, AddIconPicker(tab, COL1 + 4, TOP - 18))
+	Gate(AnyIconOn, AddDropdown(tab, "QUICK_THEME", THEME_ORDER, function(value) return L["THEME_" .. value] end,
+		function() return nil end,
+		function(value)
+			for key, v in pairs(THEMES[value]) do db[key] = v end
+			AfterReset()
+		end, COL2 + 4, TOP, COLUMN_DROPDOWN))
 
 	local y = TOP - 82
 	GateCheck(AnyIconOn, AddSectionCheck(tab, "FLOAT", "bounce", COL1, y))
@@ -1764,13 +1903,19 @@ local function BuildBehaviorTab(tab)
 		function(value) return L["SOUND_" .. value] end,
 		function() return db.soundChoice end,
 		function(value) db.soundChoice = value; PlayQuestSound() end,
-		COL2 + 4, TOP - 104, 140))
+		COL2 + 4, TOP - 104, 140, nil,
+		function(value) if PlaySound then pcall(PlaySound, QUEST_SOUNDS[value], "Master") end end))
 	local test = CreateFrame("Button", nil, tab, "UIPanelButtonTemplate")
 	test:SetSize(70, 22)
 	test:SetPoint("TOPLEFT", COL2 + 152, TOP - 123)
 	Loc(test, "SOUND_TEST")
 	test:SetScript("OnClick", PlayQuestSound)
 	Gate(SoundOn, test)
+
+	GateCheck(AnyIconOn, AddCheck(tab, "DONE_CHECK", "DONE_CHECK_TIP", "doneCheck", COL1, TOP - 160))
+	GateCheck(AddonOn, AddCheck(tab, "READY_ALERT", "READY_ALERT_TIP", "readyAlert", COL1, TOP - 208))
+	GateCheck(function() return db.minimap end,
+		AddCheck(tab, "MINIMAP_SUMMARY", "MINIMAP_SUMMARY_TIP", "minimapSummary", COL2, TOP - 160))
 end
 
 -- Profiles tab in the Ace3 layout players know from RareScanner and many others: intro, reset,
@@ -1992,7 +2137,7 @@ local SETTINGS_SECTIONS = {
 	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 258 },
 	{ key = "TAB_ICON", build = BuildIconTab, height = 312 },
 	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 340 },
-	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 152 },
+	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 262 },
 }
 local SECTION_GAP = 18
 local CONTENT_WIDTH = 600 -- until the scroll frame reports its real width

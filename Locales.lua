@@ -1087,3 +1087,81 @@ local v121 = {
 for code, keys in pairs(v121) do
 	for k, v in pairs(keys) do locales[code][k] = v end
 end
+
+-- v1.2.2: check mark when done, animated count, quest ready alert, minimap summary, quick themes.
+local v122 = {
+	enUS = {
+		DONE_CHECK = "Check mark when done", DONE_CHECK_TIP = "A mob you no longer need shows a green check mark for a moment before its icon goes.",
+		READY_ALERT = "Announce quests ready to turn in", READY_ALERT_TIP = "A chat line when every objective of a quest is done.",
+		READY_TO_TURN_IN = "Ready to turn in: %s",
+		MINIMAP_SUMMARY = "Quest summary on the minimap button", MINIMAP_SUMMARY_TIP = "Hover the minimap button to see what is left of each quest.",
+		SUMMARY_TITLE = "Still to do", SUMMARY_MORE = "...and %d more quests",
+		PROGRESS_PULSE = "Animate the count", PROGRESS_PULSE_TIP = "It pulses when it goes up and turns gold when one is left.",
+		QUICK_THEME = "Quick theme", TIP_QUICK_THEME = "Sets size, float, glow and text size in one click. Your icon stays.",
+		THEME_classic = "Classic", THEME_subtle = "Subtle (small, still)", THEME_flashy = "Flashy (big, glowing)",
+	},
+	ptBR = {
+		DONE_CHECK = "Visto ao concluir", DONE_CHECK_TIP = "Um mob que você não precisa mais mostra um visto verde por um instante antes do ícone sumir.",
+		READY_ALERT = "Avisar missões prontas para entregar", READY_ALERT_TIP = "Uma linha no chat quando todos os objetivos de uma missão terminam.",
+		READY_TO_TURN_IN = "Pronta para entregar: %s",
+		MINIMAP_SUMMARY = "Resumo das missões no botão do minimapa", MINIMAP_SUMMARY_TIP = "Passe o mouse no botão do minimapa para ver o que falta de cada missão.",
+		SUMMARY_TITLE = "Ainda falta", SUMMARY_MORE = "...e mais %d missões",
+		PROGRESS_PULSE = "Animar a contagem", PROGRESS_PULSE_TIP = "Pulsa quando sobe e fica dourada quando falta um.",
+		QUICK_THEME = "Tema rápido", TIP_QUICK_THEME = "Ajusta tamanho, flutuação, brilho e tamanho do texto num clique. Seu ícone continua o mesmo.",
+		THEME_classic = "Clássico", THEME_subtle = "Discreto (pequeno, parado)", THEME_flashy = "Chamativo (grande, brilhando)",
+	},
+	esES = {
+		DONE_CHECK = "Marca al completar", DONE_CHECK_TIP = "Un enemigo que ya no necesitas muestra una marca verde un momento antes de que su icono desaparezca.",
+		READY_ALERT = "Avisar misiones listas para entregar", READY_ALERT_TIP = "Una línea en el chat cuando todos los objetivos de una misión están hechos.",
+		READY_TO_TURN_IN = "Lista para entregar: %s",
+		MINIMAP_SUMMARY = "Resumen de misiones en el botón del minimapa", MINIMAP_SUMMARY_TIP = "Pasa el ratón por el botón del minimapa para ver lo que falta de cada misión.",
+		SUMMARY_TITLE = "Pendiente", SUMMARY_MORE = "...y %d misiones más",
+		PROGRESS_PULSE = "Animar el contador", PROGRESS_PULSE_TIP = "Late cuando sube y se vuelve dorado cuando falta uno.",
+		QUICK_THEME = "Tema rápido", TIP_QUICK_THEME = "Ajusta tamaño, flotación, brillo y tamaño del texto con un clic. Tu icono no cambia.",
+		THEME_classic = "Clásico", THEME_subtle = "Discreto (pequeño, quieto)", THEME_flashy = "Llamativo (grande, brillante)",
+	},
+	deDE = {
+		DONE_CHECK = "Häkchen bei Erledigung", DONE_CHECK_TIP = "Ein Gegner, den du nicht mehr brauchst, zeigt kurz ein grünes Häkchen, bevor sein Symbol verschwindet.",
+		READY_ALERT = "Abgabebereite Quests melden", READY_ALERT_TIP = "Eine Chatzeile, wenn alle Ziele einer Quest erfüllt sind.",
+		READY_TO_TURN_IN = "Bereit zur Abgabe: %s",
+		MINIMAP_SUMMARY = "Questübersicht am Minimap-Knopf", MINIMAP_SUMMARY_TIP = "Fahre mit der Maus über den Minimap-Knopf, um zu sehen, was bei jeder Quest noch fehlt.",
+		SUMMARY_TITLE = "Noch zu tun", SUMMARY_MORE = "...und %d weitere Quests",
+		PROGRESS_PULSE = "Zähler animieren", PROGRESS_PULSE_TIP = "Er pulsiert, wenn er steigt, und wird golden, wenn nur noch eins fehlt.",
+		QUICK_THEME = "Schnelles Thema", TIP_QUICK_THEME = "Stellt Größe, Schweben, Leuchten und Textgröße mit einem Klick ein. Dein Symbol bleibt.",
+		THEME_classic = "Klassisch", THEME_subtle = "Dezent (klein, ruhig)", THEME_flashy = "Auffällig (groß, leuchtend)",
+	},
+	frFR = {
+		DONE_CHECK = "Coche une fois terminé", DONE_CHECK_TIP = "Un monstre dont vous n'avez plus besoin affiche une coche verte un instant avant que son icône disparaisse.",
+		READY_ALERT = "Annoncer les quêtes à rendre", READY_ALERT_TIP = "Une ligne dans le chat quand tous les objectifs d'une quête sont remplis.",
+		READY_TO_TURN_IN = "Prête à rendre : %s",
+		MINIMAP_SUMMARY = "Résumé des quêtes sur le bouton de la minicarte", MINIMAP_SUMMARY_TIP = "Survolez le bouton de la minicarte pour voir ce qui reste de chaque quête.",
+		SUMMARY_TITLE = "Reste à faire", SUMMARY_MORE = "...et %d autres quêtes",
+		PROGRESS_PULSE = "Animer le compteur", PROGRESS_PULSE_TIP = "Il pulse quand il augmente et devient doré quand il n'en reste qu'un.",
+		QUICK_THEME = "Thème rapide", TIP_QUICK_THEME = "Règle la taille, le flottement, la lueur et la taille du texte en un clic. Votre icône reste.",
+		THEME_classic = "Classique", THEME_subtle = "Discret (petit, immobile)", THEME_flashy = "Voyant (grand, lumineux)",
+	},
+	itIT = {
+		DONE_CHECK = "Spunta al completamento", DONE_CHECK_TIP = "Un nemico che non ti serve più mostra per un attimo una spunta verde prima che la sua icona sparisca.",
+		READY_ALERT = "Annuncia missioni pronte da consegnare", READY_ALERT_TIP = "Una riga in chat quando tutti gli obiettivi di una missione sono completati.",
+		READY_TO_TURN_IN = "Pronta da consegnare: %s",
+		MINIMAP_SUMMARY = "Riepilogo missioni sul pulsante della minimappa", MINIMAP_SUMMARY_TIP = "Passa il mouse sul pulsante della minimappa per vedere cosa manca in ogni missione.",
+		SUMMARY_TITLE = "Ancora da fare", SUMMARY_MORE = "...e altre %d missioni",
+		PROGRESS_PULSE = "Anima il contatore", PROGRESS_PULSE_TIP = "Pulsa quando sale e diventa dorato quando ne manca uno.",
+		QUICK_THEME = "Tema rapido", TIP_QUICK_THEME = "Imposta dimensione, fluttuazione, bagliore e dimensione del testo con un clic. La tua icona resta.",
+		THEME_classic = "Classico", THEME_subtle = "Discreto (piccolo, fermo)", THEME_flashy = "Vistoso (grande, luminoso)",
+	},
+}
+for code, keys in pairs(v122) do
+	for k, v in pairs(keys) do locales[code][k] = v end
+end
+
+-- What's new (shown once after updating): v1.2.2.
+local news122 = {
+	enUS = "|cffffd200•|r A green check mark when a mob is no longer needed.\n|cffffd200•|r The count pulses when it goes up and turns gold when one is left.\n|cffffd200•|r A chat line when a quest is ready to turn in.\n|cffffd200•|r Hover the minimap button to see what is left of each quest.\n|cffffd200•|r Quick themes: Classic, Subtle and Flashy.\n|cffffd200•|r A play button next to each sound in the menu.\n\nEach one can be turned off in the options.",
+	ptBR = "|cffffd200•|r Um visto verde quando um mob não é mais necessário.\n|cffffd200•|r A contagem pulsa quando sobe e fica dourada quando falta um.\n|cffffd200•|r Uma linha no chat quando uma missão está pronta para entregar.\n|cffffd200•|r Passe o mouse no botão do minimapa para ver o que falta de cada missão.\n|cffffd200•|r Temas rápidos: Clássico, Discreto e Chamativo.\n|cffffd200•|r Um botão para ouvir cada som no menu.\n\nCada um pode ser desligado nas opções.",
+	esES = "|cffffd200•|r Una marca verde cuando un enemigo ya no se necesita.\n|cffffd200•|r El contador late cuando sube y se vuelve dorado cuando falta uno.\n|cffffd200•|r Una línea en el chat cuando una misión está lista para entregar.\n|cffffd200•|r Pasa el ratón por el botón del minimapa para ver lo que falta de cada misión.\n|cffffd200•|r Temas rápidos: Clásico, Discreto y Llamativo.\n|cffffd200•|r Un botón para escuchar cada sonido en el menú.\n\nCada uno se puede desactivar en las opciones.",
+	deDE = "|cffffd200•|r Ein grünes Häkchen, wenn ein Gegner nicht mehr gebraucht wird.\n|cffffd200•|r Der Zähler pulsiert, wenn er steigt, und wird golden, wenn nur noch eins fehlt.\n|cffffd200•|r Eine Chatzeile, wenn eine Quest abgabebereit ist.\n|cffffd200•|r Fahre über den Minimap-Knopf, um zu sehen, was bei jeder Quest noch fehlt.\n|cffffd200•|r Schnelle Themen: Klassisch, Dezent und Auffällig.\n|cffffd200•|r Ein Knopf zum Anhören jedes Tons im Menü.\n\nJedes davon lässt sich in den Optionen abschalten.",
+	frFR = "|cffffd200•|r Une coche verte quand un monstre n'est plus nécessaire.\n|cffffd200•|r Le compteur pulse quand il augmente et devient doré quand il n'en reste qu'un.\n|cffffd200•|r Une ligne dans le chat quand une quête est prête à rendre.\n|cffffd200•|r Survolez le bouton de la minicarte pour voir ce qui reste de chaque quête.\n|cffffd200•|r Thèmes rapides : Classique, Discret et Voyant.\n|cffffd200•|r Un bouton pour écouter chaque son dans le menu.\n\nChacun peut être désactivé dans les options.",
+	itIT = "|cffffd200•|r Una spunta verde quando un nemico non serve più.\n|cffffd200•|r Il contatore pulsa quando sale e diventa dorato quando ne manca uno.\n|cffffd200•|r Una riga in chat quando una missione è pronta da consegnare.\n|cffffd200•|r Passa il mouse sul pulsante della minimappa per vedere cosa manca in ogni missione.\n|cffffd200•|r Temi rapidi: Classico, Discreto e Vistoso.\n|cffffd200•|r Un pulsante per ascoltare ogni suono nel menu.\n\nOgnuno si può disattivare nelle opzioni.",
+}
+for code, text in pairs(news122) do locales[code].NEWS_TEXT = text end
