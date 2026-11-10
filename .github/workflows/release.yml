@@ -1,15 +1,44 @@
 # Push a version tag (e.g. v1.0.1) to build the addon zip and upload it to CurseForge and
 # GitHub Releases. Needs the repository secret CF_API_KEY (CurseForge API token) and the
 # "## X-Curse-Project-ID" line in the .toc.
+# The "check" job runs first: syntax, the mocked WoW run (every control clicked, quest log and
+# nameplate scenarios) and the translations. If any of it fails, nothing is uploaded.
 name: Package and release
 
 on:
   push:
     tags:
       - "v*"
+  # Run by hand (Actions tab or "gh workflow run") to try the checks; only a tag uploads.
+  workflow_dispatch:
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT (Lua 5.1, like WoW)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq luajit
+
+      - name: Syntax
+        run: |
+          for f in Locales.lua CSCoder_QuestIndicator.lua; do
+            luajit -e "assert(loadfile('$f'))" && echo "$f OK"
+          done
+
+      - name: Mocked WoW run
+        run: luajit tools/wowmock.lua .
+
+      - name: Mocked WoW run from old saved variables
+        run: luajit tools/wowmock.lua . old
+
+      - name: Translations
+        run: luajit tools/check_translations.lua .
+
   release:
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write

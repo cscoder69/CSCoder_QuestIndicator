@@ -237,3 +237,6 @@ for _, e in ipairs(errors) do print("  " .. e) end
 local pname = db.profiles.Default and "Default" or db.chars["Tester - Realm"]
 local p = db.profiles[pname]
 print(pname .. ": scale", p.scale, "offset", p.offset, "style", p.style, "glow", p.glow, "| root.scale", db.scale, "| savedCVars", db.savedCVars and db.savedCVars.SoftTargetIconGameObject)
+
+-- Exit code for the release check: any error or unexpected global fails it.
+os.exit((#errors > 0 or #unexpected > 0) and 1 or 0)
