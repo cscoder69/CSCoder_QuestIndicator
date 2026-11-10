@@ -111,6 +111,14 @@ live in game after `/reload`.
   every release.**
 - **Profile sharing** (Profiles tab, `OpenShareWindow`): "CQI1:key=bTRUE/nNUM/sTEXT;..." with
   %XX escapes; import only takes known keys of the right type into the current profile.
+- **v1.2.2 (branch `feature/v1.2.2`, NOT released, waiting for the user's in-game test):**
+  check mark when done (`doneCheck`, `HideOrComplete`: an icon that stops being needed within
+  3 s of an objective finishing turns into ReadyCheck-Ready and fades; `questLog.completedAt`),
+  animated count (`progressPulse`: `f.textPop` when the number goes up, gold with one left),
+  ready-to-turn-in chat line (`readyAlert`), minimap tooltip summary (`minimapSummary`,
+  `questLog.summary`), quick themes (Icon section, `THEMES` inside `BuildIconTab`), play button
+  per row in the sound menu (`AddDropdown(..., preview)`). NEWS_TEXT already says 1.2.2.
+  The arrow to the nearest quest mob goes in a separate branch later (user: test it apart).
 - **Badge experiment** (2026-11-09): built, tried in game, user found it ugly and dropped it; the
   commits were reverted. Do not bring it back unless asked (maybe with real artwork).
 - `/cqi` opens the options, `/cqi toggle` toggles the addon, `/cqi setup` the guide, `/cqi news` what's new, `/cqi plate` measures the target plate.
