@@ -125,6 +125,7 @@ clickAll(later, 1)
 try("slash", env.SlashCmdList.CSCODERQUESTINDICATOR, "toggle")
 try("slash open", env.SlashCmdList.CSCODERQUESTINDICATOR, "")
 try("slash setup", env.SlashCmdList.CSCODERQUESTINDICATOR, "setup")
+try("slash news", env.SlashCmdList.CSCODERQUESTINDICATOR, "news")
 print("setup seen:", env.CSCoderQuestIndicatorDB.setupSeen["Tester - Realm"])
 
 -- /cqi plate on a fake target plate drawn at 0.8 distance scale: the saved size must be the
