@@ -334,16 +334,28 @@ local objectiveTexts = {} -- { text = lower case objective, kind = quest kind }
 -- What the last quest log scan found: unfinished objectives per quest (the minimap tooltip
 -- summary) and when an objective last finished (icons that stop being needed right after show
 -- the check mark).
-local questLog = { summary = {}, completedAt = -100 }
+local questLog = { summary = {}, completedAt = -100, byName = {} }
 
 -- A name found in an unfinished objective ("Kobold Vermin slain: 3/10", "Crate of Supplies:
 -- 1/4"): its quest kind and progress.
+-- Answers are kept per name until the quest log changes (questLog.byName is emptied with each
+-- scan), so a crowded area with a full quest log stays light: one search per mob name, not one
+-- per nameplate every second.
 local function ObjectiveKindForName(name)
 	if not name or name == "" then return nil end
 	name = name:lower()
-	for _, objective in ipairs(objectiveTexts) do
-		if objective.text:find(name, 1, true) then return objective.kind, ProgressText(objective.text) end
+	local known = questLog.byName[name]
+	if known == nil then
+		known = false
+		for _, objective in ipairs(objectiveTexts) do
+			if objective.text:find(name, 1, true) then
+				known = { kind = objective.kind, progress = ProgressText(objective.text) }
+				break
+			end
+		end
+		questLog.byName[name] = known
 	end
+	if known then return known.kind, known.progress end
 	return nil
 end
 
@@ -776,6 +788,7 @@ end
 
 function RebuildObjectiveTexts()
 	wipe(objectiveTexts)
+	wipe(questLog.byName)
 	if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then return end
 	-- An objective that was unfinished on the last scan and is finished now plays the sound
 	-- (once per scan); a quest whose last objective just finished is announced as ready.

@@ -5,6 +5,7 @@
 - **Fix:** a mob needed by two quests kept no icon once one quest was done (for example 3/3 done, the other still at 2/8). It is marked again, with the count of the quest that still needs it when that quest names the mob.
 - **Report a bug** button in the options window, with the link to the issues page.
 - **/cqi debug**: a short report to copy (versions, client, language, main settings, place, other nameplate and quest addons, the addon's last errors), ready to paste in a bug report.
+- Lighter with a full quest log and crowded areas (mob names are looked up once per quest log change).
 - Every release is now checked automatically before it is published.
 
 ## v1.2.2

@@ -1,6 +1,6 @@
 # CS.Coder - Quest Indicator — notes for Claude (and any dev)
 
-Read this first when working on the addon. Last updated 2026-11-09 (v1.2.2 published).
+Read this first when working on the addon. Last updated 2026-11-10 (v1.2.3 published).
 
 ## Working with the user
 - Chat in **Brazilian Portuguese**; code, comments, commits, docs and in-game text in **English**.
@@ -137,7 +137,7 @@ live in game after `/reload`.
   game closed meanwhile). At 100% it plays on Master.
 - **Hide in instanced content** (`hideInInstances`, on by default; the user's tester got errors in
   dungeons). `UsablePlate(unit)` never returns forbidden plates; plates are measured outside instances only.
-- **Bug reports (v1.2.3, branch `feature/v1.2.3`, NOT released: the user tests it next day, 2026-11-10):** `/cqi debug` (`ShowDebug`: versions, client, language, main switches,
+- **Bug reports (v1.2.3, released 2026-11-10):** `/cqi debug` (`ShowDebug`: versions, client, language, main switches,
   instance, plate cvars, other quest/nameplate addons, last errors) and a "Report a bug" button
   (issues URL), both in the copy window (`OpenShareWindow("copy", title, hint, text)`). Errors that
   mention the addon are kept in `root.lastErrors` (last 10) by a wrapper around the current error
@@ -194,8 +194,15 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
 - 1.2.2 (2026-11-09): own options window in a OneForAll-like look (Settings keeps a landing page),
   check mark when done, animated count, ready alert, minimap summary, quick themes, sound preview
   and volume, hide in instanced content (default on), forbidden-plate safety.
+- 1.2.3 (2026-11-10): two quests on one mob keep the mark, /cqi debug + Report a bug, error
+  capture, name lookups cached per quest log scan, CHANGELOG.md for CurseForge, release check job.
 
 ## Ideas the user liked, not done yet
+- **Ideas noted 2026-11-10 (user: "anota mas não execute"):** special glow when a quest has one
+  objective left; reddish warning for quests well above your level; hide a mob's icon while you
+  fight it (back if you leave combat without killing it); ground glow around quest items; search
+  box in the options; preview scenarios (daily, group, almost done, combat); undo the last change;
+  all counts on a mob shared by several quests ("2/8 · 1/5"); translation help link on CurseForge.
 - **Ideas reviewed with the user on 2026-11-09 (after v1.2.2):**
   - Next candidate (user: "interessante"): **quest item button**: when you target the mob a quest
     item must be used on, a small button with that item appears (secure action button: combat rules).

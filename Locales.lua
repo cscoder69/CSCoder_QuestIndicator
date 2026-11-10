@@ -1266,3 +1266,16 @@ local multiFix = {
 for code, text in pairs(multiFix) do
 	locales[code].NEWS_TEXT = "|cffffd200•|r " .. text .. "\n" .. locales[code].NEWS_TEXT
 end
+
+-- What's new 1.2.3: lighter with a full quest log.
+local perf = {
+	enUS = "Lighter with a full quest log and crowded areas.",
+	ptBR = "Mais leve com o registro de missões cheio e em áreas lotadas.",
+	esES = "Más ligero con el registro de misiones lleno y en zonas abarrotadas.",
+	deDE = "Leichter bei vollem Questlog und in vollen Gebieten.",
+	frFR = "Plus léger avec un journal de quêtes plein et dans les zones bondées.",
+	itIT = "Più leggero con il registro delle missioni pieno e nelle zone affollate.",
+}
+for code, text in pairs(perf) do
+	locales[code].NEWS_TEXT = locales[code].NEWS_TEXT .. "\n|cffffd200•|r " .. text
+end
