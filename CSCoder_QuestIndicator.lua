@@ -589,8 +589,8 @@ local objectiveStates = {} -- questID -> { [objective index] = finished }, to he
 
 -- Sounds for "objective complete" (sound kit IDs), picked by ear in game on 2026-11-09 from a
 -- longer list. The old choices (ping, ready, warning, level up) fall back to the default.
-local QUEST_SOUNDS = { coins = 120, auction = 5274, auctionclose = 1204, worldquest = 44295, bell = 6674, quest = 878 }
-local QUEST_SOUND_ORDER = { "coins", "auction", "auctionclose", "worldquest", "bell", "quest" }
+local QUEST_SOUNDS = { coins = 120, auction = 5274, auctionclose = 1204, worldquest = 44295, bell = 6674, questlog = 875, quest = 878 }
+local QUEST_SOUND_ORDER = { "coins", "auction", "auctionclose", "worldquest", "bell", "questlog", "quest" }
 
 local function PlayQuestSound()
 	local id = QUEST_SOUNDS[db.soundChoice] or QUEST_SOUNDS[DEFAULTS.soundChoice]
