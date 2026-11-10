@@ -1,6 +1,6 @@
 # CS.Coder - Quest Indicator — notes for Claude (and any dev)
 
-Read this first when working on the addon. Last updated 2026-11-08 (v1.1.0 published).
+Read this first when working on the addon. Last updated 2026-11-09 (v1.2.1 published).
 
 ## Working with the user
 - Chat in **Brazilian Portuguese**; code, comments, commits, docs and in-game text in **English**.
@@ -92,14 +92,28 @@ live in game after `/reload`.
   settings" / "Configure". Configure = Look (icon, size, anchor, X/Y, float, glow + "Use default";
   the user wants it all on one page), What to show, Done, each beside
   its own live preview (`previews` list: `BuildPreview` can make several). Any close marks it seen.
-  Texts are English only until the user approves the layout.
+  Translated in all 6 languages (2026-11-09).
 - **Icon anchor** (`anchor`, `objectAnchor`): top/bottom/left/right of the plate; side anchors use
   the health bar (`PlateBar`). Changing it resets X/Y to that side's start.
-- **Lua 200-locals limit:** the main chunk is close to it (about 6 free on 2026-11-09). New helpers
+- **Lua 200-locals limit:** the main chunk is close to it (8 free after v1.2.1). New helpers
   go inside `do ... end` blocks (see the setup guide and the plate measuring code).
 - **Plates on WoW Forever are restricted:** GetTop/GetPoint error ("Can't measure restricted
   regions"); size and scale can be read. `MeasurePlate` protects every read and estimates the bar.
-- `/cqi` opens the options, `/cqi toggle` toggles the addon.
+- **Quest items' own look** (`objectOwnLook`, `objectStyle`, `objectBounce`, `objectGlow`, off by
+  default): `Look(f, key)` picks the item's or the shared value; the icon picker edits any style key
+  (`AddIconPicker(..., key)`, `iconPicker.key`). Float height/time and glow intensity stay shared.
+- **Count on quest items** (`objectProgress`, on by default): `IsQuestObject` returns progress too.
+  When tooltips show nothing, mobs and items fall back to their name in an unfinished objective of
+  the quest log (`ObjectiveKindForName`, catches "Coyote" in "Coyote Tail: 3/8" too).
+- **Hover help:** sliders and dropdowns show `TIP_<label key>` (when it exists) and `SLIDER_HINT`.
+- **What's new** (`ShowNews`, `/cqi news`): once per version after an update (`root.lastVersion`;
+  never in the "dev" copy, never on a fresh install). **Update `NEWS_TEXT` in all 6 languages for
+  every release.**
+- **Profile sharing** (Profiles tab, `OpenShareWindow`): "CQI1:key=bTRUE/nNUM/sTEXT;..." with
+  %XX escapes; import only takes known keys of the right type into the current profile.
+- **Badge experiment** (2026-11-09): built, tried in game, user found it ugly and dropped it; the
+  commits were reverted. Do not bring it back unless asked (maybe with real artwork).
+- `/cqi` opens the options, `/cqi toggle` toggles the addon, `/cqi setup` the guide, `/cqi news` what's new, `/cqi plate` measures the target plate.
 
 ## Local checks (run before every hand-off)
 LuaJIT (Lua 5.1, same as WoW) is installed: `C:\Users\Claudio\AppData\Local\Programs\LuaJIT\bin\luajit.exe`.
@@ -131,10 +145,14 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
 - 1.1.0 (2026-11-08): options v2 (4 tabs, fixed preview, gates), profiles, 6 languages, color by
   quest type, combat fade/hide, minimap button, hand-driven float, ForeverLootSparkles cvar fix.
   First release through the GitHub Action (worked first time).
+- 1.2.0 (2026-11-09): progress text with fonts/formats, sound, one scrolling settings page, preview
+  window, 37 icons in 3 categories (icon picker), two-column layout.
+- 1.2.1 (2026-11-09): setup guide, icon anchor, items' own look and count, re-cut icons, new sound
+  list (picked by ear), hover help, what's new window, profile export/import, welcome line,
+  restricted-plate fixes. Version numbers: third digit only for now.
 
 ## Ideas the user liked, not done yet
-- **Separate look for mobs vs items** (own style, float and glow per kind). Proposed a [Mobs | Items]
-  selector; after that the user chose the 4-tab layout, and this stayed open — ask before building.
+- ~~Separate look for mobs vs items~~ DONE in v1.2.1 (`objectOwnLook`).
 - **Badges** (like ItemTree's "Keep 12" pill): a floating, draggable tracker of objective badges
   ("Timberling Sprouts 8/12"), or a badge with progress above the mob.
 - More: custom icon color, show only on target/mouseover, transparency, hide in dungeons/raids,
@@ -147,10 +165,10 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
      undoes the icon scale (`f.text`, `PlaceText`).
   2. X / Y labels with -200..200 ranges and mouse-wheel steps — BUILT 2026-11-09 (items got X too).
      Drag-to-position on the preview: user postponed it for a long time (2026-11-09).
-  3. Separate look for mobs vs items (approved).
+  3. Separate look for mobs vs items — DONE v1.2.1.
   4. Custom icon color + transparency.
-  5. Sound when an objective completes (user loved it).
-  6. Small extras, LAST: keybinding toggle, hide in dungeons/raids, only on target/mouseover.
+  5. Sound when an objective completes — DONE (sound list picked by ear in v1.2.1).
+  6. Small extras, LAST: hide in dungeons/raids, only on target/mouseover. Keybinding: user said NO (2026-11-09).
   - Objective tracker with badges: later, it overlaps Questie.
   - CurseForge page: GIF of the icons, screenshots of the panel/styles, better title/summary/description.
 - **Other WoW clients** (Classic Era/Anniversary, Cata/MoP Classic, Retail): user decided 2026-11-09

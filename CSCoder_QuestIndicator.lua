@@ -1727,9 +1727,9 @@ local function BuildIconTab(tab)
 	note:SetWidth(560)
 	note:SetJustifyH("LEFT")
 	Gate(ItemsOn, Loc(note, "ITEM_LOOK_TIP"))
-	Gate(ItemLookOn, AddIconPicker(tab, COL1 + 4, y - 40, "objectStyle"))
-	GateCheck(ItemLookOn, AddCheck(tab, "FLOAT", nil, "objectBounce", COL2, y - 38))
-	GateCheck(ItemLookOn, AddCheck(tab, "GLOW_SECTION", nil, "objectGlow", COL2, y - 70))
+	Gate(ItemLookOn, AddIconPicker(tab, COL1 + 4, y - 50, "objectStyle"))
+	GateCheck(ItemLookOn, AddCheck(tab, "FLOAT", nil, "objectBounce", COL2, y - 48))
+	GateCheck(ItemLookOn, AddCheck(tab, "GLOW_SECTION", nil, "objectGlow", COL2, y - 80))
 end
 
 local function BuildBehaviorTab(tab)
@@ -1990,7 +1990,7 @@ end
 -- TOP right under its heading.
 local SETTINGS_SECTIONS = {
 	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 258 },
-	{ key = "TAB_ICON", build = BuildIconTab, height = 300 },
+	{ key = "TAB_ICON", build = BuildIconTab, height = 312 },
 	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 340 },
 	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 152 },
 }
@@ -2304,11 +2304,11 @@ local function BuildWizard()
 	version:SetPoint("BOTTOMRIGHT", -24, 20)
 	version:SetText(AddonVersion())
 	local useDefault = CreateFrame("Button", nil, welcome, "UIPanelButtonTemplate")
-	useDefault:SetSize(200, 30)
+	useDefault:SetSize(240, 30)
 	useDefault:SetPoint("BOTTOMRIGHT", welcome, "BOTTOM", -8, 40)
 	Loc(useDefault, "WIZ_USE_DEFAULT")
 	local configure = CreateFrame("Button", nil, welcome, "UIPanelButtonTemplate")
-	configure:SetSize(200, 30)
+	configure:SetSize(240, 30)
 	configure:SetPoint("BOTTOMLEFT", welcome, "BOTTOM", 8, 40)
 	Loc(configure, "WIZ_CONFIGURE")
 
@@ -2358,7 +2358,7 @@ local function BuildWizard()
 	back:SetPoint("RIGHT", nextButton, "LEFT", -8, 0)
 	Loc(back, "WIZ_BACK")
 	local openOptions = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
-	openOptions:SetSize(170, 26)
+	openOptions:SetSize(200, 26)
 	openOptions:SetPoint("RIGHT", back, "LEFT", -8, 0)
 	Loc(openOptions, "WIZ_OPEN_OPTIONS")
 
@@ -2413,7 +2413,7 @@ do
 		if not news then
 			local backdrop = BackdropTemplateMixin and "BackdropTemplate" or nil
 			news = CreateFrame("Frame", ADDON .. "News", UIParent, backdrop)
-			news:SetSize(520, 400)
+			news:SetSize(540, 450)
 			news:SetPoint("CENTER", 0, 60)
 			news:SetFrameStrata("DIALOG")
 			news:EnableMouse(true)
@@ -2436,7 +2436,7 @@ do
 			sub:SetText(TITLE)
 			local body = news:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 			body:SetPoint("TOPLEFT", 28, -100)
-			body:SetWidth(464)
+			body:SetWidth(484)
 			body:SetJustifyH("LEFT")
 			body:SetSpacing(4)
 			Loc(body, "NEWS_TEXT")

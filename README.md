@@ -6,19 +6,22 @@ A floating, animated **"!"** over the mobs and items you still need for your que
 
 ## Features
 
+- **Setup guide:** new characters get a short guide: start with the defaults, or pick your icon, size, position and what to show, with a live preview.
 - **Quest mobs:** a "!" floats above the nameplate of every mob you still need for an active quest. It disappears once the objective is done.
 - **Quest items:** herbs, crates, sprouts and other quest items on the ground get a "!" too, on the nearest one in front of you.
 - **37 icons in 3 categories:** Standard (quests), Themed and States / Priority, picked from a window that shows each category.
 
   ![Icon styles](media/icon_styles.png)
-- **Quest progress:** the objective count ("8/12") next to each quest mob, glued to the icon or placed on its own, with its own size, font, outline and color.
+- **Quest progress:** the objective count ("8/12") next to each quest mob, glued to the icon or placed on its own, with its own size, font, outline and color. It can show on quest items too.
 - **Sound when an objective completes**, with a choice of sounds.
 - **Color by quest type:** daily and repeatable quests in blue, group and elite quests in red.
 - **Float and glow:** adjustable float height and duration, optional glow with adjustable intensity.
-- **Size and position:** size and X/Y for mobs and items; type exact values or use the sliders.
+- **Size and position:** size, anchor (top, bottom, left or right of the nameplate) and X/Y for mobs and items; type exact values or use the sliders.
+- **Own look for quest items:** their own icon, float and glow, if you like.
 - **In combat:** keep, fade or hide the icons.
 - **Live preview** in its own small window, sized like your real nameplates.
-- **Profiles:** create, copy, reset and delete; each character remembers its profile.
+- **Profiles:** create, copy, reset and delete; each character remembers its profile. Export a profile as text and import it on another PC or from a friend.
+- **Help on hover** for the options, and a short "what's new" after each update.
 - **Minimap button:** left-click opens the options, right-click turns the addon on or off, drag to move.
 - **Languages:** English, Português (Brasil), Español, Deutsch, Français, Italiano. Other game languages use English.
 
@@ -31,6 +34,8 @@ A floating, animated **"!"** over the mobs and items you still need for your que
 |---|---|
 | `/cqi` | Opens the options |
 | `/cqi toggle` | Turns the addon on or off |
+| `/cqi setup` | Opens the setup guide again |
+| `/cqi news` | Shows what's new in this version |
 | `/cqi plate` | Measures your target's nameplate so the preview matches it |
 
 ## Notes
