@@ -69,7 +69,7 @@ local SETTINGS_VERSION = 5
 
 -- The addon's version from the .toc (the packager fills it in; a dev copy shows "dev").
 local function AddonVersion()
-	local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+	local getMeta = C_AddOns and C_AddOns.GetAddOnMetadata
 	local version = getMeta and getMeta(ADDON, "Version")
 	if type(version) ~= "string" or version:find("^@") then version = "dev" end
 	return version
@@ -244,8 +244,7 @@ local function RebuildQuestTitles()
 	wipe(quests.kindByID)
 	wipe(quests.levelByTitle)
 	wipe(quests.levelByID)
-	local count = (C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetNumQuestLogEntries())
-		or (GetNumQuestLogEntries and GetNumQuestLogEntries()) or 0
+	local count = (C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetNumQuestLogEntries()) or 0
 	for i = 1, count do
 		local title, isHeader, questID, kind, level = nil, nil, nil, "normal", nil
 		if C_QuestLog and C_QuestLog.GetInfo then
@@ -257,14 +256,6 @@ local function RebuildQuestTitles()
 				elseif (tonumber(info.suggestedGroup) or 0) > 1 then
 					kind = "group"
 				end
-			end
-		elseif GetQuestLogTitle then
-			local t, questLevel, tag, header, _, _, frequency, id = GetQuestLogTitle(i)
-			title, isHeader, questID, level = t, header, id, tonumber(questLevel)
-			if frequency == true or (tonumber(frequency) or 0) > 0 then
-				kind = "daily"
-			elseif (type(tag) == "number" and tag > 1) or (type(tag) == "string" and tag ~= "") then
-				kind = "group"
 			end
 		end
 		if title and not isHeader then
@@ -423,8 +414,7 @@ do
 	local tooltips -- Questie's QuestieTooltips module, once found
 	local function Module()
 		if tooltips then return tooltips end
-		local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Questie"))
-			or (IsAddOnLoaded and IsAddOnLoaded("Questie"))
+		local loaded = C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Questie")
 		if not loaded or type(QuestieLoader) ~= "table" or type(QuestieLoader.ImportModule) ~= "function" then return nil end
 		local module = QuestieLoader:ImportModule("QuestieTooltips")
 		if type(module) == "table" and type(module.lookupByKey) == "table" then tooltips = module end
@@ -940,7 +930,6 @@ local function QuestTitle(questID, logIndex)
 		local info = C_QuestLog.GetInfo(logIndex)
 		title = info and info.title
 	end
-	if not title and GetQuestLogTitle then title = GetQuestLogTitle(logIndex) end
 	return title or "?"
 end
 
@@ -1064,8 +1053,7 @@ function RestoreObjectCVars()
 end
 
 local function IsLoaded(addon)
-	if C_AddOns and C_AddOns.IsAddOnLoaded then return C_AddOns.IsAddOnLoaded(addon) end
-	return IsAddOnLoaded and IsAddOnLoaded(addon)
+	return C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded(addon) or false
 end
 
 -- Opens the soft target's nameplate for quest objects only, so NPCs and mailboxes don't get one.
@@ -1234,8 +1222,6 @@ local function GetCSCoderParent()
 	if Settings and Settings.RegisterCanvasLayoutCategory then
 		parent.category = Settings.RegisterCanvasLayoutCategory(frame, PARENT_NAME)
 		Settings.RegisterAddOnCategory(parent.category)
-	elseif InterfaceOptions_AddCategory then
-		InterfaceOptions_AddCategory(frame)
 	end
 	_G.CSCoderOptionsParent = parent
 	return parent
@@ -2544,7 +2530,7 @@ function ShowDebug()
 	local plate = root.plateGeom
 	Add("plate", plate and string.format("%.0fx%.0f", plate.w or 0, plate.h or 0) or "none")
 	local others = {}
-	local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+	local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded
 	for _, name in ipairs({ "ForeverLootSparkles", "Questie", "Plater", "TidyPlates", "Kui_Nameplates", "ElvUI", "OneForAll", "pfQuest" }) do
 		if isLoaded and isLoaded(name) then others[#others + 1] = name end
 	end
@@ -2743,9 +2729,6 @@ local function BuildSettingsLanding()
 	local parent = GetCSCoderParent()
 	if Settings and Settings.RegisterCanvasLayoutSubcategory and parent.category then
 		settingsCategory = Settings.RegisterCanvasLayoutSubcategory(parent.category, page, SUBTITLE)
-	elseif InterfaceOptions_AddCategory then
-		page.parent = parent.name
-		InterfaceOptions_AddCategory(page)
 	end
 end
 
@@ -3354,8 +3337,7 @@ do
 	-- when we can read it; addons whose whole job is automating quests count as soon as they are
 	-- loaded). Every read is guarded.
 	local function Loaded(name)
-		return (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded(name))
-			or (IsAddOnLoaded and IsAddOnLoaded(name)) or false
+		return C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded(name) or false
 	end
 	local OTHERS = {
 		{ "Questie", function(kind)

@@ -1,5 +1,10 @@
 # CS.Coder - Quest Indicator
 
+## v1.2.6
+
+- Cleaner code: the addon now uses only the game's modern functions (no deprecated API left) and creates no unnecessary global variables.
+- No change in what you see or how it works.
+
 ## v1.2.5
 
 - New **Gameplay** tab in the options.

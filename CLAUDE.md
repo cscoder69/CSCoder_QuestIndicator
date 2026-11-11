@@ -1,6 +1,6 @@
 # CS.Coder - Quest Indicator — notes for Claude (and any dev)
 
-Read this first when working on the addon. Last updated 2026-11-11 (v1.2.5 published).
+Read this first when working on the addon. Last updated 2026-11-11 (v1.2.6 published).
 
 ## Working with the user
 - Chat in **Brazilian Portuguese**; code, comments, commits, docs and in-game text in **English**.
@@ -192,6 +192,15 @@ live in game after `/reload`. Second dev PC (notebook, set up 2026-11-11): sourc
   commits were reverted. Do not bring it back unless asked (maybe with real artwork).
 - `/cqi` opens the options, `/cqi toggle` toggles the addon, `/cqi setup` the guide, `/cqi news` what's new, `/cqi plate` measures the target plate.
 
+## Reddit / code audit rules (2026-11-11)
+r/wowaddons (and similar) audit releases with Ketho's WoW API extension: no unnecessary globals, no
+severe performance issues, **no deprecated API**, and posts must carry an **"AI Disclaimer:"** (code
+written with Claude, icons made with ChatGPT). So: modern APIs only (C_AddOns, C_QuestLog.GetInfo,
+Settings) — the legacy fallbacks (IsAddOnLoaded, GetAddOnMetadata, GetQuestLogTitle,
+GetNumQuestLogEntries, InterfaceOptions_AddCategory) were removed. Globals written: only
+`CSCoderQuestIndicatorDB`, `SLASH_CSCODERQUESTINDICATOR1`, `CSCoderOptionsParent` (shared on purpose)
+and frames named `CSCoder_QuestIndicator*`. Check with `luajit -bl <file> | grep GSET`.
+
 ## Local checks (run before every hand-off)
 LuaJIT (Lua 5.1, same as WoW) is installed: `C:\Users\Claudio\AppData\Local\Programs\LuaJIT\bin\luajit.exe`.
 ```bash
@@ -242,6 +251,9 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
   party-objective and secret-value fixes, event batching and other performance work.
 - 1.2.5 (2026-11-11): Gameplay tab: quest pickup (auto / button on lists, single quest at once),
   auto turn-in (rewards to choose left alone), Shift = manual, never interferes with other addons.
+- 1.2.6 (2026-11-11): modern APIs only (deprecated fallbacks removed for the Reddit code audit);
+  README badges/screenshots, new CurseForge page. The CurseForge app had replaced the dev junction
+  with its v1.2.5 copy after a power cut: keep this addon unmanaged in the app on dev PCs.
 
 ## Quest pickup / Gameplay tab (released in v1.2.5; turn-in confirmed in game, button position not yet)
 - Third tab **Gameplay** (Settings | Gameplay | Profiles; built inline in the `builders` list —

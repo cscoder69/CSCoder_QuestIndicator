@@ -1392,3 +1392,16 @@ local news125 = {
 	itIT = B .. "Nuova scheda |cffffd200Gameplay|r nelle opzioni.\n" .. B .. "|cffffd200Raccolta missioni|r (disattivata di base): accetta le missioni dei PNG, automaticamente parlando o con il pulsante |cffffd200Accetta tutte|r nell'elenco del PNG (una missione sola viene accettata subito).\n" .. B .. "|cffffd200Consegna automatica|r (disattivata di base): consegna le missioni completate. Se devi scegliere una ricompensa, scegli tu.\n" .. B .. "Tieni premuto |cffffd200Shift|r quando clicchi un PNG per fare tutto a mano quella volta.\n" .. B .. "Non intralcia mai un altro addon che lo fa già (Questie, Leatrix Plus...).",
 }
 for code, text in pairs(news125) do locales[code].NEWS_TEXT = text end
+
+-- What's new 1.2.6: one line added at the end of the 1.2.5 list (players skipping 1.2.5 still see it).
+local news126 = {
+	enUS = "Cleaner code: only the game's modern functions are used now.",
+	ptBR = "Código mais limpo: agora só as funções modernas do jogo são usadas.",
+	esES = "Código más limpio: ahora solo se usan las funciones modernas del juego.",
+	deDE = "Saubererer Code: Es werden jetzt nur noch die modernen Funktionen des Spiels genutzt.",
+	frFR = "Code plus propre : seules les fonctions modernes du jeu sont utilisées désormais.",
+	itIT = "Codice più pulito: ora vengono usate solo le funzioni moderne del gioco.",
+}
+for code, text in pairs(news126) do
+	locales[code].NEWS_TEXT = locales[code].NEWS_TEXT .. "\n" .. B .. text
+end
