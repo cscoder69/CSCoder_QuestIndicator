@@ -395,6 +395,132 @@ do
 	print("level: green per gap 1/2/3/4/10", table.concat(shades, " "))
 	print("level: shades step down, full red from 4", shades[1] == 1 and shades[2] < 1 and shades[3] < shades[2]
 		and shades[4] < shades[3] and shades[5] == shades[4])
+
+	-- Quest pickup (Gameplay). The pickup block's event frame is the last one with OnEvent
+	-- created before the main event frame.
+	local pickupFrame
+	for _, f in ipairs(frames) do
+		if f == eventFrame then break end
+		if f._scripts.OnEvent then pickupFrame = f end
+	end
+	local function Fire(event) try("pickup " .. event, pickupFrame._scripts.OnEvent, pickupFrame, event) end
+	-- The talk ends: the NPC's window closes (then opens again for the next case).
+	local function Close() env.GossipFrame:Hide(); env.QuestFrame:Hide(); Fire("GOSSIP_CLOSED"); env.GossipFrame:Show(); env.QuestFrame:Show() end
+	local available, current, accepted, opened = {}, nil, 0, 0
+	local logFull = false
+	local function Reset() available = { { questID = 1, title = "A" }, { questID = 2, title = "B" }, { questID = 3, title = "C", frequency = 1 } }; accepted, opened = 0, 0 end
+	env.C_GossipInfo = {
+		GetAvailableQuests = function() return available end,
+		SelectAvailableQuest = function(id) opened = opened + 1; current = id; Fire("QUEST_DETAIL") end,
+	}
+	env.AcceptQuest = function()
+		if logFull then Fire("GOSSIP_SHOW") return end
+		accepted = accepted + 1
+		for i, q in ipairs(available) do if q.questID == current then table.remove(available, i) break end end
+		Fire("GOSSIP_SHOW") -- the game reopens the NPC's window
+	end
+	env.UnitExists = function(unit) return unit == "npc" or unit == "questnpc" end
+	env.UnitGUID = function(unit) return unit == "player" and "Player-1" or "Creature-0-1-2-3-555-0" end
+	local shift = false
+	env.IsShiftKeyDown = function() return shift end
+	env.GossipFrame = env.CreateFrame("Frame")
+	env.QuestFrame = env.CreateFrame("Frame")
+	env.GetTime = function() return 1000 end
+
+	Reset(); Fire("GOSSIP_SHOW")
+	print("pickup: off by default -> nothing", accepted == 0)
+	profile.questPickup, profile.questPickupMode, profile.questPickupRepeatable = true, "auto", true -- (the UI clicks above changed them)
+	Reset(); Fire("GOSSIP_SHOW")
+	print("pickup: auto -> all 3 accepted (daily too)", accepted)
+	Close()
+	profile.questPickupRepeatable = false
+	Reset(); Fire("GOSSIP_SHOW")
+	print("pickup: repeatables off -> 2 accepted", accepted)
+	Close()
+	profile.questPickupRepeatable = true
+	shift = true
+	Reset(); Fire("GOSSIP_SHOW")
+	print("pickup: Shift held -> nothing", accepted == 0)
+	shift = false
+	Close()
+	logFull = true
+	Reset(); Fire("GOSSIP_SHOW")
+	print("pickup: full quest log -> each opened once, no loop", opened == 3 and accepted == 0)
+	logFull = false
+	Close()
+	profile.questPickupMode = "button"
+	Reset(); Fire("GOSSIP_SHOW")
+	local pickButton
+	for _, f in ipairs(frames) do if rawget(f, "nextQuest") then pickButton = f end end
+	print("pickup: button mode -> nothing yet, button shown", accepted == 0 and pickButton ~= nil and pickButton._shown)
+	if pickButton then try("pickup click", pickButton._scripts.OnClick, pickButton) end
+	print("pickup: button click -> all 3 accepted", accepted)
+	-- Button mode, NPC with a single quest (it opens straight away, no list): accepted at once.
+	Close(); Reset(); current = 1
+	Fire("QUEST_DETAIL")
+	print("pickup: button mode, single quest -> accepted at once", accepted == 1)
+	-- Button mode, a quest the player picks from a list: theirs to accept.
+	Close(); Reset()
+	local savedAccept = env.AcceptQuest
+	env.AcceptQuest = function() accepted = accepted + 1 end
+	Fire("GOSSIP_SHOW"); current = 2; Fire("QUEST_DETAIL")
+	print("pickup: button mode, quest picked from a list -> left to the player", accepted == 0)
+	env.AcceptQuest = savedAccept
+	-- Shift on a single-quest NPC: nothing automatic.
+	Close(); Reset(); shift = true; current = 1
+	Fire("QUEST_DETAIL")
+	print("pickup: Shift on a single quest -> nothing", accepted == 0)
+	shift = false
+	Close()
+	-- A quest shared by a player is never accepted.
+	profile.questPickupMode = "auto"
+	env.UnitGUID = function() return "Player-2" end
+	accepted = 0; Fire("QUEST_DETAIL")
+	print("pickup: shared by a player -> left alone", accepted == 0)
+	-- Questie's own auto-accept on: we stay out of the way.
+	env.UnitGUID = function(unit) return unit == "player" and "Player-1" or "Creature-0-1-2-3-555-0" end
+	env.C_AddOns = { IsAddOnLoaded = function(name) return name == "Questie" end }
+	env.Questie = { db = { profile = { autoAccept = { enabled = true } } } }
+	Close(); Reset(); Fire("GOSSIP_SHOW")
+	print("pickup: Questie's auto-accept on -> we do nothing", accepted == 0)
+	env.Questie, env.C_AddOns = nil, savedAddOns
+	profile.questPickup = false
+
+	-- Auto turn-in (separate switch). Quest 10 is finished, 11 isn't.
+	local active, turned, choices = {}, 0, 0
+	local function ResetActive() active = { { questID = 10, title = "Done", isComplete = true }, { questID = 11, title = "Open", isComplete = false } }; turned = 0 end
+	env.C_GossipInfo = {
+		GetAvailableQuests = function() return {} end,
+		SelectAvailableQuest = function() end,
+		GetActiveQuests = function() return active end,
+		SelectActiveQuest = function(id) current = id; Fire("QUEST_PROGRESS") end,
+	}
+	env.IsQuestCompletable = function() return true end
+	env.CompleteQuest = function() Fire("QUEST_COMPLETE") end
+	env.GetNumQuestChoices = function() return choices end
+	env.GetQuestReward = function()
+		turned = turned + 1
+		for i, q in ipairs(active) do if q.questID == current then table.remove(active, i) break end end
+		Fire("GOSSIP_SHOW")
+	end
+	Close(); ResetActive(); Fire("GOSSIP_SHOW")
+	print("turnin: off by default -> nothing", turned == 0)
+	profile.questTurnIn = true
+	Close(); ResetActive(); Fire("GOSSIP_SHOW")
+	print("turnin: on -> the finished quest handed in (only it)", turned == 1)
+	choices = 2
+	Close(); ResetActive(); Fire("GOSSIP_SHOW")
+	print("turnin: reward to choose -> nothing done, no loop", turned == 0)
+	choices = 0
+	env.C_AddOns = { IsAddOnLoaded = function(name) return name == "Questie" end }
+	env.Questie = { db = { profile = { autocomplete = true } } }
+	Close(); ResetActive(); Fire("GOSSIP_SHOW")
+	print("turnin: Questie's auto-complete on -> we do nothing", turned == 0)
+	env.Questie, env.C_AddOns = nil, savedAddOns
+	profile.questTurnIn = false
+	profile.questPickup = false
+	env.C_GossipInfo, env.AcceptQuest, env.GossipFrame, env.QuestFrame = nil, nil, nil, nil
+	rawset(env, "Questie", nil)
 	env.C_QuestLog.GetInfo = savedGetInfo
 	env.C_TooltipInfo = nil
 	env.C_QuestLog.GetNumQuestLogEntries = function() return 0 end
@@ -410,7 +536,7 @@ local db = env.CSCoderQuestIndicatorDB
 local names = {}
 for name in pairs(db.profiles) do names[#names + 1] = name end
 print("profiles:", table.concat(names, ", "), "| char ->", db.chars["Tester - Realm"], "| language:", db.language)
-local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1, CreateColor = 1, IsInInstance = 1, SettingsPanel = 1, InterfaceOptionsFrame = 1, HideUIPanel = 1, issecretvalue = 1, issecrettable = 1, UnitGUID = 1 }
+local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1, CreateColor = 1, IsInInstance = 1, SettingsPanel = 1, InterfaceOptionsFrame = 1, HideUIPanel = 1, QuestIsDaily = 1, QuestIsWeekly = 1, Questie = 1, issecretvalue = 1, issecrettable = 1, UnitGUID = 1 }
 local unexpected = {}
 for k in pairs(missing) do if not known[k] then unexpected[#unexpected + 1] = k end end
 print("unexpected nil globals:", #unexpected == 0 and "none" or table.concat(unexpected, ", "))

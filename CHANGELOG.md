@@ -1,5 +1,18 @@
 # CS.Coder - Quest Indicator
 
+## v1.2.5
+
+- New **Gameplay** tab in the options.
+- **Quest pickup** (off by default): accepts the quests NPCs offer. Two modes:
+  - **Automatic on talk**: talking to an NPC accepts all its quests.
+  - **Button on the window**: an NPC with a list of quests gets an **Accept all** button; an NPC with a single quest is accepted at once.
+  - Dailies and repeatables can be included or left out.
+- **Auto turn-in** (off by default, separate switch): hands in finished quests. When you must choose a reward, nothing is done — you pick it.
+- Hold **Shift** when you click an NPC to do everything by hand that time.
+- Only NPCs: quests shared by players or started from items are never accepted by themselves.
+- Never gets in the way of another addon that already does this (Questie's auto-accept / auto-complete, Leatrix Plus, QuickQuest, AutoTurnIn): the Gameplay tab tells you when one is active.
+- Quest pickup is also on the setup guide's Extras page.
+
 ## v1.2.4
 
 - **Level alert** (on by default): the icon turns red for quests above your level — light red at 2 levels above, red at 3, full red at 4 or more.

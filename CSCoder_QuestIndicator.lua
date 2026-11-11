@@ -56,6 +56,10 @@ local DEFAULTS = {
 	minimapSummary = true, -- the minimap button's tooltip lists the open objectives
 	hideWhileFighting = false, -- a mob you are fighting loses its icon (back if it survives)
 	highLevelRed = true,  -- level alert: red icon for quests 2+ levels above you (deeper per level)
+	questPickup = false,  -- Gameplay: accept the quests NPCs offer
+	questPickupMode = "auto", -- "auto" (on talk, Shift skips) or "button" ("Accept all" on the window)
+	questPickupRepeatable = true, -- dailies and repeatables too
+	questTurnIn = false,  -- Gameplay: hand in finished quests (rewards to choose are left alone)
 	soundChoice = "coins", -- key in QUEST_SOUNDS
 	soundVolume = 100,   -- its volume in percent
 }
@@ -2860,8 +2864,43 @@ function BuildPanel()
 		return pieces
 	end
 
-	local builders = { BuildSettingsTab, BuildProfilesTab }
-	local keys = { "TAB_SETTINGS", "TAB_PROFILES" }
+	-- Gameplay: quest pickup (on/off, mode, repeatables). Laid out from the panel's top like
+	-- Profiles. (Inline: a named local here would cross Lua's 200-locals limit.)
+	local builders = { BuildSettingsTab, function(tab)
+		local top, left = TOP - 48, LEFT + 20
+		local intro = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		intro:SetPoint("TOPLEFT", left, top)
+		intro:SetWidth(PROFILE_TEXT_WIDTH)
+		intro:SetJustifyH("LEFT")
+		Loc(intro, "GAMEPLAY_INTRO")
+		AddHeading(tab, "PICKUP_HEADING", left, top - 34)
+		local function PickupOn() return db.active and db.questPickup end
+		GateCheck(On.AddonOn, AddCheck(tab, "QUEST_PICKUP", "QUEST_PICKUP_TIP", "questPickup", left - 4, top - 52))
+		Gate(PickupOn, AddDropdown(tab, "PICKUP_MODE", { "auto", "button" },
+			function(value) return value == "button" and L.PICKUP_MODE_BUTTON or L.PICKUP_MODE_AUTO end,
+			function() return db.questPickupMode end,
+			function(value) db.questPickupMode = value end,
+			left, top - 108, COLUMN_DROPDOWN))
+		GateCheck(PickupOn, AddCheck(tab, "PICKUP_REPEATABLE", "PICKUP_REPEATABLE_TIP", "questPickupRepeatable", left - 4, top - 160))
+		GateCheck(On.AddonOn, AddCheck(tab, "QUEST_TURNIN", "QUEST_TURNIN_TIP", "questTurnIn", left - 4, top - 214))
+		-- How it behaves, in one visible line (not only in the hover help).
+		local how = tab:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		how:SetPoint("TOPLEFT", left, top - 270)
+		how:SetWidth(PROFILE_TEXT_WIDTH)
+		how:SetJustifyH("LEFT")
+		Loc(how, "PICKUP_HOW")
+		-- Another addon already accepts or hands in quests: say so (ours waits while it does).
+		local other = tab:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+		other:SetPoint("TOPLEFT", left, top - 318)
+		other:SetWidth(PROFILE_TEXT_WIDTH)
+		other:SetJustifyH("LEFT")
+		other:SetTextColor(1, 0.6, 0.2)
+		tab:HookScript("OnShow", function()
+			local name = questLog.OtherPickupAddon and questLog.OtherPickupAddon()
+			other:SetText(name and string.format(L.PICKUP_OTHER_ADDON, name) or "")
+		end)
+	end, BuildProfilesTab }
+	local keys = { "TAB_SETTINGS", "TAB_GAMEPLAY", "TAB_PROFILES" }
 	local tabs, frames = {}, {}
 	local selected = 1
 	local TAB_GAP = 4
@@ -3064,6 +3103,12 @@ local function BuildWizard()
 	AddWizardText(extraPage, "WIZ_EXTRA_TITLE", "WIZ_EXTRA_TEXT")
 	AddCheck(extraPage, "HIGH_LEVEL", "HIGH_LEVEL_TIP", "highLevelRed", 28, -126)
 	AddCheck(extraPage, "HIDE_FIGHTING", "HIDE_FIGHTING_TIP", "hideWhileFighting", 28, -204)
+	AddCheck(extraPage, "QUEST_PICKUP", "QUEST_PICKUP_TIP", "questPickup", 28, -282)
+	Gate(function() return db.questPickup end, AddDropdown(extraPage, "PICKUP_MODE", { "auto", "button" },
+		function(value) return value == "button" and L.PICKUP_MODE_BUTTON or L.PICKUP_MODE_AUTO end,
+		function() return db.questPickupMode end,
+		function(value) db.questPickupMode = value end,
+		32, -340, 200))
 
 	-- 5. Done.
 	local donePage = NewPage()
@@ -3265,6 +3310,241 @@ function MeasurePlate(unit, force)
 	if UpdatePreview then UpdatePreview() end
 	return geom
 end
+end
+
+---------------------------------------------------------------------------------------------
+-- Gameplay tab: quest pickup and turn-in, two separate switches, both off by default.
+-- Pickup accepts every quest an NPC offers:
+--   "auto":   talking to the NPC accepts them all, one after the other.
+--   "button": an NPC's list gets an "Accept all" button that does the same on click; an NPC
+--             with a single quest (no list, the quest opens straight away) is accepted at once.
+-- Turn-in hands in finished quests when you talk to the NPC. A quest whose reward must be
+-- chosen (more than one choice) is left for you: nothing is done on that page.
+-- Shift held when the talk starts leaves that whole conversation manual.
+-- How it walks a list: open the first wanted quest (gossip or old greeting window), handle it
+-- (QUEST_DETAIL accept, QUEST_PROGRESS / QUEST_COMPLETE hand in); the game reopens the NPC's
+-- window, which opens the next one. A quest that can't be done (full quest log, missing items)
+-- is not opened again for 10 s, so the walk always ends. Finished quests go first: handing one
+-- in can unlock the next.
+-- Only real NPCs: quests shared by players and quests started from items are left alone.
+-- Another addon already doing it (Questie's auto-accept / auto-complete, Leatrix Plus...)
+-- always wins: ours stays out of its way.
+-- (Own block: no main-chunk locals, which are at Lua's 200 limit.)
+---------------------------------------------------------------------------------------------
+do
+	local paused = false -- Shift held at the start of the talk: manual until the windows close
+	local batch = false  -- an "Accept all" click is walking through the list
+	local sawList = false -- the NPC showed a list in this talk (a quest opened from it is the player's pick)
+	local tried = {}     -- quest key -> when we last opened it
+	local button
+
+	local function PickupOn() return db and db.active and db.questPickup end
+	local function TurnInOn() return db and db.active and db.questTurnIn end
+	local function AutoMode() return PickupOn() and db.questPickupMode ~= "button" end
+
+	local function FromNPC(unit)
+		local guid = UnitGUID and UnitGUID(unit)
+		if Hidden.Value(guid) or type(guid) ~= "string" then return false end
+		return guid:find("^Creature") ~= nil or guid:find("^Vehicle") ~= nil or guid:find("^GameObject") ~= nil
+	end
+	local function QuestUnit() return (UnitExists("questnpc") and "questnpc") or "npc" end
+
+	-- Another addon that accepts or hands in quests by itself: we never interfere with it. Each
+	-- check says whether that addon does it right now, for "accept" or "turnin" (its own switch
+	-- when we can read it; addons whose whole job is automating quests count as soon as they are
+	-- loaded). Every read is guarded.
+	local function Loaded(name)
+		return (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded(name))
+			or (IsAddOnLoaded and IsAddOnLoaded(name)) or false
+	end
+	local OTHERS = {
+		{ "Questie", function(kind)
+			local profile = type(Questie) == "table" and Questie.db and Questie.db.profile
+			if not profile then return false end
+			if kind == "turnin" then return profile.autocomplete end
+			return profile.autoAccept and profile.autoAccept.enabled
+		end },
+		{ "Leatrix_Plus", function() return type(LeaPlusDB) == "table" and LeaPlusDB.AutomateQuests == "On" end, "Leatrix Plus" },
+		{ "QuickQuest", function() return true end },
+		{ "AutoTurnIn", function() return true end },
+		-- (Zygor's setting names are a best guess, not checked: if wrong, they just never match.)
+		{ "ZygorGuidesViewerClassic", function(kind)
+			local profile = type(ZGV) == "table" and ZGV.db and ZGV.db.profile
+			if not profile then return false end
+			if kind == "turnin" then return profile.autoturnin end
+			return profile.autoaccept
+		end, "Zygor Guides" },
+	}
+	-- The name of the addon doing it ("accept" or "turnin"; nil kind = either), or nil.
+	-- (Shared with the Gameplay tab, which shows a note.)
+	function questLog.OtherPickupAddon(kind)
+		for _, other in ipairs(OTHERS) do
+			if Loaded(other[1]) then
+				local ok, on = pcall(other[2], kind or "accept")
+				if not (ok and on) and not kind then ok, on = pcall(other[2], "turnin") end
+				if ok and on then return other[3] or other[1] end
+			end
+		end
+		return nil
+	end
+
+	local function Wanted(repeatable, frequency)
+		if db.questPickupRepeatable then return true end
+		return not (repeatable or (tonumber(frequency) or 0) > 0)
+	end
+	local function Fresh(key)
+		local last = tried[key]
+		return not last or GetTime() - last > 10
+	end
+
+	-- The next quest of the open window to accept / to hand in: its key and a function that
+	-- opens it.
+	local function NextGossip()
+		if not (C_GossipInfo and C_GossipInfo.GetAvailableQuests and C_GossipInfo.SelectAvailableQuest) then return nil end
+		for _, quest in ipairs(C_GossipInfo.GetAvailableQuests() or {}) do
+			local key = quest.questID or quest.title
+			if key and Wanted(quest.repeatable, quest.frequency) and Fresh(key) then
+				return key, function() C_GossipInfo.SelectAvailableQuest(quest.questID) end
+			end
+		end
+	end
+	local function NextGreeting()
+		if not (GetNumAvailableQuests and SelectAvailableQuest) then return nil end
+		for i = 1, GetNumAvailableQuests() or 0 do
+			local trivial, frequency, repeatable -- (named, never the global "_": writing it taints)
+			if GetAvailableQuestInfo then trivial, frequency, repeatable = GetAvailableQuestInfo(i) end
+			local key = (GetAvailableTitle and GetAvailableTitle(i)) or i
+			if Wanted(repeatable, frequency) and Fresh(key) then
+				return key, function() SelectAvailableQuest(i) end
+			end
+		end
+	end
+	local function NextDoneGossip()
+		if not (C_GossipInfo and C_GossipInfo.GetActiveQuests and C_GossipInfo.SelectActiveQuest) then return nil end
+		for _, quest in ipairs(C_GossipInfo.GetActiveQuests() or {}) do
+			local key = "done " .. tostring(quest.questID or quest.title)
+			if quest.isComplete and Fresh(key) then
+				return key, function() C_GossipInfo.SelectActiveQuest(quest.questID) end
+			end
+		end
+	end
+	local function NextDoneGreeting()
+		if not (GetNumActiveQuests and GetActiveTitle and SelectActiveQuest) then return nil end
+		for i = 1, GetNumActiveQuests() or 0 do
+			local title, isComplete = GetActiveTitle(i)
+			local key = "done " .. tostring(title or i)
+			if isComplete and Fresh(key) then
+				return key, function() SelectActiveQuest(i) end
+			end
+		end
+	end
+
+	-- Opens the next quest; false when there is none left.
+	local function Step(nextQuest)
+		local key, open = nextQuest()
+		if not key then return false end
+		tried[key] = GetTime()
+		open()
+		return true
+	end
+
+	local function HideButton() if button then button:Hide() end end
+
+	-- "button" mode: the button sits in the top right corner of the NPC's window while it has
+	-- quests left to accept. It is a child of that window, so it shows and hides with it: on some
+	-- clients the window only opens a moment after GOSSIP_SHOW, so its state isn't checked here.
+	local function UpdateButton(host, nextQuest)
+		if not (PickupOn() and db.questPickupMode == "button" and host) then HideButton() return end
+		if not button then
+			button = CreateFrame("Button", nil, UIParent, "UIPanelButtonTemplate")
+			button:SetSize(120, 22)
+			button:SetScript("OnClick", function(self)
+				self:Hide()
+				batch = true
+				if not Step(self.nextQuest) then batch = false end
+			end)
+		end
+		button.nextQuest = nextQuest
+		button:SetParent(host)
+		button:ClearAllPoints()
+		button:SetPoint("TOPRIGHT", host, "TOPRIGHT", -32, -30)
+		button:SetFrameLevel(host:GetFrameLevel() + 20)
+		button:SetText(L.PICKUP_ACCEPT_ALL)
+		button:SetShown(nextQuest() ~= nil)
+	end
+
+	local function AllClosed()
+		return not ((GossipFrame and GossipFrame:IsVisible()) or (QuestFrame and QuestFrame:IsVisible()))
+	end
+
+	local frame = CreateFrame("Frame")
+	for _, event in ipairs({ "GOSSIP_SHOW", "GOSSIP_CLOSED", "QUEST_GREETING", "QUEST_DETAIL",
+		"QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_FINISHED" }) do
+		pcall(frame.RegisterEvent, frame, event)
+	end
+	frame:SetScript("OnEvent", function(_, event)
+		if event == "GOSSIP_CLOSED" or event == "QUEST_FINISHED" then
+			-- Between two quest windows everything is closed for a moment: wait before calling
+			-- the talk over.
+			C_Timer.After(0.5, function()
+				if AllClosed() then paused, batch, sawList = false, false, false; wipe(tried); HideButton() end
+			end)
+			return
+		end
+		local acceptOn = PickupOn() and not questLog.OtherPickupAddon("accept")
+		local turnInOn = TurnInOn() and not questLog.OtherPickupAddon("turnin")
+		if not (acceptOn or turnInOn) then HideButton() return end
+
+		if event == "QUEST_PROGRESS" then
+			-- Handing in, the "items needed" page: continue when the quest can be completed.
+			if turnInOn and not paused and not IsShiftKeyDown() and FromNPC(QuestUnit())
+				and IsQuestCompletable and IsQuestCompletable() and CompleteQuest then
+				CompleteQuest()
+			end
+			return
+		elseif event == "QUEST_COMPLETE" then
+			-- The reward page: take it only when there is nothing to choose (0 or 1 reward).
+			-- Two or more to choose from: left for the player, nothing done here.
+			local choices = (GetNumQuestChoices and GetNumQuestChoices()) or 0
+			if turnInOn and not paused and not IsShiftKeyDown() and FromNPC(QuestUnit())
+				and choices <= 1 and GetQuestReward then
+				GetQuestReward(choices)
+			end
+			return
+		elseif event == "QUEST_DETAIL" then
+			if not acceptOn or not FromNPC(QuestUnit()) then return end
+			if batch then AcceptQuest() return end
+			-- "auto" accepts every quest it is shown; "button" only a quest the NPC opened
+			-- straight away (it has just one, no list). A quest the player picked from a list
+			-- in "button" mode is theirs to accept.
+			if not paused and not IsShiftKeyDown() and (AutoMode() or not sawList) then
+				-- Same rule for repeatables as in the lists.
+				local daily = (QuestIsDaily and QuestIsDaily()) or (QuestIsWeekly and QuestIsWeekly())
+				if db.questPickupRepeatable or not daily then AcceptQuest() end
+			end
+			return
+		end
+
+		-- GOSSIP_SHOW or QUEST_GREETING: the NPC's window with its lists.
+		local gossip = event == "GOSSIP_SHOW"
+		sawList = true
+		local host = gossip and GossipFrame or QuestFrame
+		if IsShiftKeyDown() and not batch then paused = true end
+		local fromNPC = FromNPC("npc")
+		if turnInOn and not paused and fromNPC and Step(gossip and NextDoneGossip or NextDoneGreeting) then
+			HideButton()
+			return
+		end
+		if not acceptOn then HideButton() return end
+		local nextQuest = gossip and NextGossip or NextGreeting
+		if batch then
+			if Step(nextQuest) then return end
+			batch = false
+		elseif AutoMode() and not paused and fromNPC and Step(nextQuest) then
+			return
+		end
+		UpdateButton(host, nextQuest)
+	end)
 end
 
 local events = CreateFrame("Frame")

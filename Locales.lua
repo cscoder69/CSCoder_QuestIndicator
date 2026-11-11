@@ -1319,6 +1319,57 @@ for code, text in pairs(perf) do
 	locales[code].NEWS_TEXT = locales[code].NEWS_TEXT .. "\n|cffffd200•|r " .. text
 end
 
+-- Gameplay tab: quest pickup. Keys: tab, intro, heading, switch + tip, mode label + hover tip,
+-- the two modes, repeatables + tip, the button's text.
+local gameplay = {
+	enUS = { "Gameplay", "Things the addon can do for you while you play.", "Quests", "Quest pickup", "Accepts the quests NPCs offer you. Off by default.", "Mode", "Automatic on talk: talking to an NPC accepts all its quests (hold Shift when you start talking to skip). Button on the window: an NPC with a list of quests gets an \"Accept all\" button; an NPC with a single quest is accepted at once.\nIf Questie's auto-accept is on, Questie does it instead.", "Automatic on talk", "Button on the window", "Include dailies and repeatables", "Daily and repeatable quests are accepted too.", "Accept all" },
+	ptBR = { "Gameplay", "Coisas que o addon pode fazer por você enquanto joga.", "Missões", "Coleta de quests", "Aceita as missões que os NPCs oferecem. Desligado por padrão.", "Modo", "Automático ao falar: falar com um NPC aceita todas as missões dele (segure Shift ao começar a falar para pular). Botão na janela: NPC com lista de missões ganha o botão \"Pegar todas\"; NPC com uma missão só é aceita na hora.\nSe o aceitar automático do Questie estiver ligado, quem faz é o Questie.", "Automático ao falar", "Botão na janela", "Incluir diárias e repetíveis", "Missões diárias e repetíveis também são aceitas.", "Pegar todas" },
+	esES = { "Jugabilidad", "Cosas que el addon puede hacer por ti mientras juegas.", "Misiones", "Recogida de misiones", "Acepta las misiones que te ofrecen los PNJ. Desactivado por defecto.", "Modo", "Automático al hablar: hablar con un PNJ acepta todas sus misiones (mantén Shift al empezar a hablar para saltarlo). Botón en la ventana: un PNJ con una lista de misiones muestra el botón \"Aceptar todas\"; un PNJ con una sola misión se acepta al momento.\nSi la aceptación automática de Questie está activa, la hace Questie.", "Automático al hablar", "Botón en la ventana", "Incluir diarias y repetibles", "También se aceptan las misiones diarias y repetibles.", "Aceptar todas" },
+	deDE = { "Gameplay", "Dinge, die das Addon beim Spielen für dich erledigen kann.", "Quests", "Quests annehmen", "Nimmt die Quests an, die NPCs dir anbieten. Standardmäßig aus.", "Modus", "Automatisch beim Ansprechen: Ein NPC-Gespräch nimmt alle seine Quests an (Shift beim Ansprechen halten, um es zu überspringen). Knopf im Fenster: Ein NPC mit einer Questliste bekommt den Knopf \"Alle annehmen\"; ein NPC mit nur einer Quest wird sofort angenommen.\nIst Questies automatisches Annehmen an, übernimmt Questie das.", "Automatisch beim Ansprechen", "Knopf im Fenster", "Tägliche und wiederholbare einschließen", "Tägliche und wiederholbare Quests werden auch angenommen.", "Alle annehmen" },
+	frFR = { "Gameplay", "Ce que l'addon peut faire pour vous pendant que vous jouez.", "Quêtes", "Prise de quêtes", "Accepte les quêtes que les PNJ vous proposent. Désactivé par défaut.", "Mode", "Automatique en parlant : parler à un PNJ accepte toutes ses quêtes (maintenez Maj en commençant à parler pour l'éviter). Bouton dans la fenêtre : un PNJ avec une liste de quêtes affiche le bouton \"Tout accepter\" ; un PNJ avec une seule quête est accepté tout de suite.\nSi l'acceptation automatique de Questie est active, c'est Questie qui s'en charge.", "Automatique en parlant", "Bouton dans la fenêtre", "Inclure journalières et répétables", "Les quêtes journalières et répétables sont aussi acceptées.", "Tout accepter" },
+	itIT = { "Gameplay", "Cose che l'addon può fare per te mentre giochi.", "Missioni", "Raccolta missioni", "Accetta le missioni che i PNG ti offrono. Disattivato di base.", "Modalità", "Automatica parlando: parlare con un PNG accetta tutte le sue missioni (tieni premuto Shift quando inizi a parlare per saltare). Pulsante nella finestra: un PNG con un elenco di missioni mostra il pulsante \"Accetta tutte\"; un PNG con una sola missione viene accettato subito.\nSe l'accettazione automatica di Questie è attiva, se ne occupa Questie.", "Automatica parlando", "Pulsante nella finestra", "Includi giornaliere e ripetibili", "Anche le missioni giornaliere e ripetibili vengono accettate.", "Accetta tutte" },
+}
+for code, t in pairs(gameplay) do
+	local l = locales[code]
+	l.TAB_GAMEPLAY, l.GAMEPLAY_INTRO, l.PICKUP_HEADING, l.QUEST_PICKUP, l.QUEST_PICKUP_TIP = t[1], t[2], t[3], t[4], t[5]
+	l.PICKUP_MODE, l.TIP_PICKUP_MODE, l.PICKUP_MODE_AUTO, l.PICKUP_MODE_BUTTON = t[6], t[7], t[8], t[9]
+	l.PICKUP_REPEATABLE, l.PICKUP_REPEATABLE_TIP, l.PICKUP_ACCEPT_ALL = t[10], t[11], t[12]
+end
+
+-- Gameplay tab: another addon already accepts or hands in quests (%s = its name).
+local pickupOther = {
+	enUS = "%s is already doing this for you, so these options wait and stay out of its way.",
+	ptBR = "O %s já faz isso por você, então estas opções ficam paradas para não atrapalhar.",
+	esES = "%s ya lo hace por ti, así que estas opciones esperan para no estorbar.",
+	deDE = "%s erledigt das bereits für dich, daher warten diese Optionen und kommen ihm nicht in die Quere.",
+	frFR = "%s le fait déjà pour vous : ces options attendent pour ne pas le gêner.",
+	itIT = "%s lo fa già per te, quindi queste opzioni restano ferme per non intralciarlo.",
+}
+for code, text in pairs(pickupOther) do locales[code].PICKUP_OTHER_ADDON = text end
+
+-- Gameplay tab: the visible line about Shift and single quests.
+local pickupHow = {
+	enUS = "Hold |cffffd200Shift|r when you click an NPC to do everything by hand that time (nothing is accepted or handed in).",
+	ptBR = "Segure |cffffd200Shift|r ao clicar no NPC para fazer tudo na mão daquela vez (nada é aceito nem entregue).",
+	esES = "Mantén |cffffd200Shift|r al hacer clic en un PNJ para hacerlo todo a mano esa vez (no se acepta ni se entrega nada).",
+	deDE = "Halte |cffffd200Shift|r beim Anklicken eines NPCs, um diesmal alles von Hand zu machen (nichts wird angenommen oder abgegeben).",
+	frFR = "Maintenez |cffffd200Maj|r en cliquant sur un PNJ pour tout faire à la main cette fois (rien n'est accepté ni rendu).",
+	itIT = "Tieni premuto |cffffd200Shift|r quando clicchi un PNG per fare tutto a mano quella volta (niente viene accettato o consegnato).",
+}
+for code, text in pairs(pickupHow) do locales[code].PICKUP_HOW = text end
+-- Gameplay tab: automatic turn-in (separate from pickup).
+local turnIn = {
+	enUS = { "Auto turn-in", "Hands in finished quests when you talk to the NPC. When you must choose a reward, nothing is done: you pick it. Hold Shift when you start talking to skip." },
+	ptBR = { "Entrega automática", "Entrega as missões prontas quando você fala com o NPC. Quando tem que escolher uma recompensa, nada é feito: você escolhe. Segure Shift ao começar a falar para pular." },
+	esES = { "Entrega automática", "Entrega las misiones terminadas al hablar con el PNJ. Si hay que elegir recompensa, no se hace nada: la eliges tú. Mantén Shift al empezar a hablar para saltarlo." },
+	deDE = { "Automatisch abgeben", "Gibt fertige Quests ab, wenn du den NPC ansprichst. Musst du eine Belohnung wählen, passiert nichts: du wählst selbst. Shift beim Ansprechen halten, um es zu überspringen." },
+	frFR = { "Rendu automatique", "Rend les quêtes terminées quand vous parlez au PNJ. S'il faut choisir une récompense, rien n'est fait : vous choisissez. Maintenez Maj en commençant à parler pour l'éviter." },
+	itIT = { "Consegna automatica", "Consegna le missioni completate quando parli con il PNG. Se devi scegliere una ricompensa, non viene fatto nulla: scegli tu. Tieni premuto Shift quando inizi a parlare per saltare." },
+}
+for code, texts in pairs(turnIn) do
+	locales[code].QUEST_TURNIN, locales[code].QUEST_TURNIN_TIP = texts[1], texts[2]
+end
+
 -- What's new (shown once after updating): v1.2.4. Replaces the 1.2.3 list.
 local B = "|cffffd200•|r "
 local news124 = {
@@ -1330,3 +1381,14 @@ local news124 = {
 	itIT = B .. "|cffffd200Avviso di livello|r: l'icona diventa rossa per le missioni sopra il tuo livello, più intensa quanto più sono alte.\n" .. B .. "|cffffd200Nascondi durante il combattimento|r (disattivato di base): un nemico che ti combatte perde l'icona, che torna se sopravvive.\n" .. B .. "Con Questie attivo, i suoi dati completano il contatore dei bottini che il gioco non mostra. Senza Questie non cambia nulla.\n" .. B .. "Le icone sono sempre disattivate in spedizioni e incursioni: lì il gioco blocca queste informazioni (le opzioni lo spiegano).\n" .. B .. "Correzione: in gruppo, gli obiettivi di un compagno non segnano più nemici per te.\n" .. B .. "Correzione: niente più errori quando il gioco nasconde i dati delle missioni, ad esempio sugli oggetti delle missioni in combattimento.\n" .. B .. "Più leggero durante le missioni, soprattutto in gruppo e nelle zone affollate.",
 }
 for code, text in pairs(news124) do locales[code].NEWS_TEXT = text end
+
+-- What's new (shown once after updating): v1.2.5. Replaces the 1.2.4 list.
+local news125 = {
+	enUS = B .. "New |cffffd200Gameplay|r tab in the options.\n" .. B .. "|cffffd200Quest pickup|r (off by default): accepts the quests NPCs offer, automatically on talk or with an |cffffd200Accept all|r button on the NPC's list (a single quest is accepted at once).\n" .. B .. "|cffffd200Auto turn-in|r (off by default): hands in finished quests. When you must choose a reward, you pick it.\n" .. B .. "Hold |cffffd200Shift|r when you click an NPC to do everything by hand that time.\n" .. B .. "Never gets in the way of another addon that already does this (Questie, Leatrix Plus...).",
+	ptBR = B .. "Nova aba |cffffd200Gameplay|r nas opções.\n" .. B .. "|cffffd200Coleta de quests|r (desligada por padrão): aceita as missões que os NPCs oferecem, automático ao falar ou com o botão |cffffd200Pegar todas|r na lista do NPC (missão única é aceita na hora).\n" .. B .. "|cffffd200Entrega automática|r (desligada por padrão): entrega as missões prontas. Quando tem que escolher recompensa, você escolhe.\n" .. B .. "Segure |cffffd200Shift|r ao clicar no NPC para fazer tudo na mão daquela vez.\n" .. B .. "Nunca atrapalha outro addon que já faz isso (Questie, Leatrix Plus...).",
+	esES = B .. "Nueva pestaña |cffffd200Jugabilidad|r en las opciones.\n" .. B .. "|cffffd200Recogida de misiones|r (desactivada por defecto): acepta las misiones que ofrecen los PNJ, automáticamente al hablar o con el botón |cffffd200Aceptar todas|r en la lista del PNJ (una sola misión se acepta al momento).\n" .. B .. "|cffffd200Entrega automática|r (desactivada por defecto): entrega las misiones terminadas. Si hay que elegir recompensa, la eliges tú.\n" .. B .. "Mantén |cffffd200Shift|r al hacer clic en un PNJ para hacerlo todo a mano esa vez.\n" .. B .. "Nunca estorba a otro addon que ya lo hace (Questie, Leatrix Plus...).",
+	deDE = B .. "Neuer Reiter |cffffd200Gameplay|r in den Optionen.\n" .. B .. "|cffffd200Quests annehmen|r (standardmäßig aus): nimmt die Quests der NPCs an, automatisch beim Ansprechen oder mit dem Knopf |cffffd200Alle annehmen|r in der NPC-Liste (eine einzelne Quest wird sofort angenommen).\n" .. B .. "|cffffd200Automatisch abgeben|r (standardmäßig aus): gibt fertige Quests ab. Musst du eine Belohnung wählen, wählst du selbst.\n" .. B .. "Halte |cffffd200Shift|r beim Anklicken eines NPCs, um diesmal alles von Hand zu machen.\n" .. B .. "Kommt nie einem anderen Addon in die Quere, das das schon macht (Questie, Leatrix Plus...).",
+	frFR = B .. "Nouvel onglet |cffffd200Gameplay|r dans les options.\n" .. B .. "|cffffd200Prise de quêtes|r (désactivée par défaut) : accepte les quêtes des PNJ, automatiquement en parlant ou avec le bouton |cffffd200Tout accepter|r sur la liste du PNJ (une quête seule est acceptée tout de suite).\n" .. B .. "|cffffd200Rendu automatique|r (désactivé par défaut) : rend les quêtes terminées. S'il faut choisir une récompense, vous choisissez.\n" .. B .. "Maintenez |cffffd200Maj|r en cliquant sur un PNJ pour tout faire à la main cette fois.\n" .. B .. "Ne gêne jamais un autre addon qui le fait déjà (Questie, Leatrix Plus...).",
+	itIT = B .. "Nuova scheda |cffffd200Gameplay|r nelle opzioni.\n" .. B .. "|cffffd200Raccolta missioni|r (disattivata di base): accetta le missioni dei PNG, automaticamente parlando o con il pulsante |cffffd200Accetta tutte|r nell'elenco del PNG (una missione sola viene accettata subito).\n" .. B .. "|cffffd200Consegna automatica|r (disattivata di base): consegna le missioni completate. Se devi scegliere una ricompensa, scegli tu.\n" .. B .. "Tieni premuto |cffffd200Shift|r quando clicchi un PNG per fare tutto a mano quella volta.\n" .. B .. "Non intralcia mai un altro addon che lo fa già (Questie, Leatrix Plus...).",
+}
+for code, text in pairs(news125) do locales[code].NEWS_TEXT = text end

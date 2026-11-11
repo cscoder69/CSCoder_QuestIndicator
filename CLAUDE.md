@@ -1,6 +1,6 @@
 # CS.Coder - Quest Indicator — notes for Claude (and any dev)
 
-Read this first when working on the addon. Last updated 2026-11-11 (v1.2.4 published).
+Read this first when working on the addon. Last updated 2026-11-11 (v1.2.5 published).
 
 ## Working with the user
 - Chat in **Brazilian Portuguese**; code, comments, commits, docs and in-game text in **English**.
@@ -240,17 +240,36 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
 - 1.2.4 (2026-11-11, first release from the second notebook): level alert (red shades), hide during
   the fight, Questie as a helper, instances always off (game's limit, info note), Extras guide page,
   party-objective and secret-value fixes, event batching and other performance work.
+- 1.2.5 (2026-11-11): Gameplay tab: quest pickup (auto / button on lists, single quest at once),
+  auto turn-in (rewards to choose left alone), Shift = manual, never interferes with other addons.
 
-## URGENT — next task (user, 2026-11-11)
-- New settings tab **"Gameplay"** (a third tab next to Settings and Profiles) with **automatic quest
-  pickup**: when you talk to an NPC that has quests to give, accept all of them automatically.
-  Alternative/extra the user mentioned: a small button in the corner of the NPC's quest window
-  (gossip / quest greeting frame) that accepts all available quests with one click.
-  Notes for building it: events GOSSIP_SHOW / QUEST_GREETING / QUEST_DETAIL; available quests via
-  C_GossipInfo.GetAvailableQuests (or GetNumAvailableQuests / SelectAvailableQuest on greeting frames),
-  AcceptQuest() on QUEST_DETAIL; skip when a modifier key is held; don't fight Questie's own
-  auto-accept if it is on; mind repeatable/daily and quests that cost something. Ask the user for
-  short option names first (see memory: short labels).
+## Quest pickup / Gameplay tab (released in v1.2.5; turn-in confirmed in game, button position not yet)
+- Third tab **Gameplay** (Settings | Gameplay | Profiles; built inline in the `builders` list —
+  a named local there would cross the 200-locals limit). Settings: `questPickup` (off),
+  `questPickupMode` "auto" | "button", `questPickupRepeatable` (on). Also on the setup guide's
+  Extras page (switch + mode). Labels proposed by me, user said "depois ajustamos": Coleta de quests,
+  Modo (Automático ao falar / Botão na janela), Incluir diárias e repetíveis, button "Pegar todas".
+- Logic: own `do` block before the events section (own event frame). GOSSIP_SHOW / QUEST_GREETING
+  open the next wanted quest (`C_GossipInfo.SelectAvailableQuest` / `SelectAvailableQuest(i)`),
+  QUEST_DETAIL `AcceptQuest()`, the game reopens the window -> next. `tried` (10 s) stops loops on a
+  full log. Auto: Shift at the start of the talk = manual until the windows close (`paused`).
+  Button mode (user's spec 2026-11-11): a LIST gets the "Pegar todas" button; an NPC with a SINGLE
+  quest (QUEST_DETAIL with no list seen, `sawList`) is accepted at once; a quest the player picks
+  from a list is theirs. Shift = all manual; said in a visible line on the tab (`PICKUP_HOW`).
+  The button is a child of the NPC window and isn't gated on `IsShown()` (the window can open a
+  moment after GOSSIP_SHOW; that was why it didn't show in game the first time).
+  Button: `UIPanelButtonTemplate` at the TOPRIGHT of GossipFrame/QuestFrame (-32, -30) — position
+  NOT checked in game yet. Only NPC/object GUIDs (no player shares, no item quests).
+- **Auto turn-in** (`questTurnIn`, off, separate switch, Gameplay tab only — not in the guide):
+  finished quests first (`C_GossipInfo.GetActiveQuests` isComplete / `GetActiveTitle`),
+  QUEST_PROGRESS `CompleteQuest()` when `IsQuestCompletable()`, QUEST_COMPLETE `GetQuestReward(n)`
+  only with 0 or 1 reward; **2+ choices = do nothing** (user's rule). Questie itself doesn't pick a
+  "recommended" reward either (it skips when choices > 1), so there was nothing to learn there.
+- **Never interfere with other addons** (user's rule): `questLog.OtherPickupAddon(kind)` checks
+  Questie (`autoAccept.enabled` / `autocomplete`), Leatrix Plus (`LeaPlusDB.AutomateQuests == "On"`),
+  QuickQuest and AutoTurnIn (loaded = active), Zygor (setting names guessed). Only LOADED addons
+  count. When one does it, ours does nothing and the Gameplay tab shows an orange note.
+- Reference used: Questie's `Modules/Auto/AutoQuesting.lua` (works on this client).
 
 ## Ideas the user liked, not done yet
 - **From the Questie comparison (2026-11-11), not built yet:** icon by objective type (kill / loot /
