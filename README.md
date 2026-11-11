@@ -2,6 +2,16 @@
 
 # CS.Coder - Quest Indicator
 
+<p align="center">
+  <a href="https://www.curseforge.com/wow/addons/cs-coder-quest-indicator"><img src="https://img.shields.io/curseforge/v/1793185?label=CurseForge&color=f16436" alt="CurseForge version"></a>
+  <a href="https://www.curseforge.com/wow/addons/cs-coder-quest-indicator"><img src="https://img.shields.io/curseforge/dt/1793185?label=downloads&color=f16436" alt="CurseForge downloads"></a>
+  <a href="https://github.com/cscoder69/CSCoder_QuestIndicator/releases/latest"><img src="https://img.shields.io/github/v/release/cscoder69/CSCoder_QuestIndicator?label=GitHub" alt="GitHub release"></a>
+  <img src="https://img.shields.io/badge/WoW-Forever%201.60.1-c9a227" alt="WoW Forever 1.60.1">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license">
+</p>
+
+<p align="center"><b><a href="https://www.curseforge.com/wow/addons/cs-coder-quest-indicator">Download on CurseForge</a></b> · <a href="https://github.com/cscoder69/CSCoder_QuestIndicator/releases/latest">GitHub release</a> · <a href="https://github.com/cscoder69/CSCoder_QuestIndicator/issues">Report a bug</a></p>
+
 A floating, animated **"!"** over the mobs and items you still need for your quests. No more hovering every mob to find out which one drops your quest item.
 
 ![Quest mobs marked in the world](media/screenshot_world.jpg)
@@ -66,7 +76,8 @@ A floating, animated **"!"** over the mobs and items you still need for your que
 
 ## Install
 
-Copy the `CSCoder_QuestIndicator` folder into `World of Warcraft\<version>\Interface\AddOns\`, or install it from CurseForge.
+- **CurseForge (easiest):** install it from [the CurseForge page](https://www.curseforge.com/wow/addons/cs-coder-quest-indicator) or the CurseForge app.
+- **By hand:** download the zip from the [latest release](https://github.com/cscoder69/CSCoder_QuestIndicator/releases/latest) and put the `CSCoder_QuestIndicator` folder into `World of Warcraft\_forever_\Interface\AddOns\`.
 
 ## Releasing (maintainers)
 
