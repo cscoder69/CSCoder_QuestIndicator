@@ -4,6 +4,12 @@
 
 A floating, animated **"!"** over the mobs and items you still need for your quests. No more hovering every mob to find out which one drops your quest item.
 
+![Quest mobs marked in the world](media/screenshot_world.jpg)
+
+| | |
+|---|---|
+| ![Progress next to the icon](media/screenshot_closeup.jpg) | ![Level alert: red for quests above your level](media/screenshot_level_alert.jpg) |
+
 ## Features
 
 - **Its own options window**, in a clean dark-and-gold look: switches, sliders with typed values, menus and a live preview. Open it with /cqi or the minimap button.
@@ -17,11 +23,20 @@ A floating, animated **"!"** over the mobs and items you still need for your que
 - **Check mark when done:** mobs you no longer need show a green check mark before their icon goes.
 - **Ready to turn in:** a chat line when every objective of a quest is done.
 - **Sound when an objective completes**, with a choice of sounds (hear each one in the menu) and its own volume.
+- **Level alert:** the icon turns red for quests above your level — light red at 2 levels above, red at 3, full red at 4 or more.
 - **Color by quest type:** daily and repeatable quests in blue, group and elite quests in red.
+- **Hide during the fight** (optional): a mob fighting you loses its icon, and gets it back if it survives.
+- **Gameplay tab:**
+  - **Quest pickup** (optional): accepts the quests NPCs offer — automatically when you talk to them, or with an **Accept all** button on the NPC's list (a single quest is accepted at once). Dailies and repeatables can be left out.
+  - **Auto turn-in** (optional): hands in finished quests. When you must choose a reward, you pick it.
+  - Hold **Shift** when you click an NPC to do everything by hand that time.
+  - Never gets in the way of another addon that already does this (Questie, Leatrix Plus, QuickQuest, AutoTurnIn).
+- **Questie as a helper:** when Questie is active, its data fills in the count for quest drops the game doesn't show. Without it nothing changes.
 - **Float and glow:** adjustable float height and duration, optional glow with adjustable intensity.
 - **Size and position:** size, anchor (top, bottom, left or right of the nameplate) and X/Y for mobs and items; type exact values or use the sliders.
 - **Own look for quest items:** their own icon, float and glow, if you like.
-- **In combat:** keep, fade or hide the icons. **Hidden in instanced content** (dungeons and raids) by default.
+- **In combat:** keep, fade or hide the icons.
+- **Not in dungeons and raids:** WoW Forever locks nameplates and quest information inside instances for every addon (Questie hides its icons there too). The icons come back as soon as you leave.
 - **Quick themes:** Classic, Subtle or Flashy in one click.
 - **Live preview** in its own small window, sized like your real nameplates.
 - **Profiles:** create, copy, reset and delete; each character remembers its profile. Export a profile as text and import it on another PC or from a friend.
@@ -55,7 +70,7 @@ Copy the `CSCoder_QuestIndicator` folder into `World of Warcraft\<version>\Inter
 
 ## Releasing (maintainers)
 
-Push a version tag (for example `v1.1.0`). The GitHub Action packages the addon and uploads it to CurseForge (WoW Forever) and GitHub Releases. Plain commits publish nothing.
+Push a version tag (for example `v1.2.5`). The GitHub Action packages the addon and uploads it to CurseForge (WoW Forever) and GitHub Releases. Plain commits publish nothing.
 
 ## License
 
