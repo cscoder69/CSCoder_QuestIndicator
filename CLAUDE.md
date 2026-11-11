@@ -287,7 +287,11 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
     transparency, show only on target/mouseover, party members' quest mobs (needs the addon on
     their side), colour-blind palette, session stats (`/cqi stats`, "useless but fun"), limit the
     number of icons in crowded areas.
-  - CurseForge page (GIF, screenshots of the new window, better description): still to do.
+  - CurseForge page: DONE 2026-11-11 (new description, gallery of 5: media/screenshot_*.jpg +
+    icon_styles). The CurseForge description editor is WYSIWYG unless "Markdown" is picked: paste the
+    Markdown from media/curseforge.md with the Markdown format selected. WebFetch of the page shows
+    rendered bold/images as `**`/`![]` too; literal (unrendered) text shows escaped (`\_`, `\*\*`).
+    Still possible later: a GIF of the icons, a screenshot of the options window.
 - ~~Separate look for mobs vs items~~ DONE in v1.2.1 (`objectOwnLook`).
 - **Badges** (like ItemTree's "Keep 12" pill): a floating, draggable tracker of objective badges
   ("Timberling Sprouts 8/12"), or a badge with progress above the mob.
