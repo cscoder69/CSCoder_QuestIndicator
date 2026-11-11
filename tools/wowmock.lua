@@ -39,6 +39,7 @@ local function newObject(kind)
 			elseif k == "NumLines" then return 0
 			elseif k == "GetParent" then return self._parent or UIParent
 			elseif k == "SetParent" then self._parent = a[1]
+			elseif k == "SetVertexColor" then self._color = a
 			end
 		end
 	end })
@@ -212,7 +213,7 @@ do
 	for _, f in ipairs(frames) do if rawget(f, "completing") then completing = true end end
 	print("quest: check mark shown", completing)
 
-	-- Inside a dungeon (hideInInstances is on by default) the mob gets no icon.
+	-- Inside a dungeon the mob never gets an icon (the game's limit, not an option).
 	related = true
 	env.IsInInstance = function() return true, "party" end
 	try("plate in dungeon", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
@@ -222,15 +223,13 @@ do
 	print("quest: icon hidden in a dungeon", not shownInDungeon)
 	env.IsInInstance = nil
 
-	-- A forbidden plate (dungeons can hand them out) is never touched, even with the option off.
-	profile.hideInInstances = false
+	-- A forbidden plate (dungeons can hand them out) is never touched, even outside instances.
 	rawset(mobPlate, "IsForbidden", function() return true end)
 	try("forbidden plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
 	try("forbidden plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
 	local onForbidden = false
 	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then onForbidden = true end end
 	print("quest: forbidden plate left alone", not onForbidden)
-	profile.hideInInstances = true
 	rawset(mobPlate, "IsForbidden", nil)
 
 	-- Two quests, same mob: the tooltip lists only quest A, already done (3/3); quest B still
@@ -262,6 +261,141 @@ do
 	local marked = false
 	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then marked = true end end
 	print("quest: mob still marked when no objective names it", marked)
+
+	-- In a group: our objective is done (8/8), a party member's (listed under their QuestPlayer
+	-- row) is not. Their progress must not mark the mob for us.
+	env.Enum.TooltipDataLineType.QuestPlayer = 18
+	env.UnitGUID = function(unit) return unit == "player" and "Player-1" or "Creature-0-1" end
+	env.C_QuestLog.UnitIsRelatedToActiveQuest = function() return nil end
+	env.C_QuestLog.GetQuestObjectives = function() return {} end
+	env.C_TooltipInfo = { GetUnit = function()
+		return { lines = {
+			{ type = 17, leftText = "Quest A" },
+			{ type = 8, leftText = "Kobold Vermin slain: 8/8", completed = true },
+			{ type = 18, leftText = "Friend", guid = "Player-2" },
+			{ type = 8, leftText = "Kobold Vermin slain: 1/8", completed = false },
+		} }
+	end }
+	try("party scan", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
+	try("party plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
+	try("party plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
+	local forParty = false
+	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then forParty = true end end
+	print("quest: party member's objective ignored", not forParty)
+
+	-- Secret values (WoW Forever hides tooltip data, e.g. objects in combat): no error, and an
+	-- icon already shown stays as it was.
+	env.C_QuestLog.UnitIsRelatedToActiveQuest = function() return true end
+	env.C_TooltipInfo = { GetUnit = function()
+		return { lines = { { type = 17, leftText = "Quest A" }, { type = 8, leftText = "Kobold Vermin slain: 2/8", completed = false } } }
+	end }
+	try("secret setup", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
+	local SECRET = {}
+	env.issecretvalue = function(value) return value == SECRET end
+	env.C_TooltipInfo = { GetUnit = function()
+		return { lines = { { type = 17, leftText = SECRET }, { type = 8, leftText = SECRET, completed = SECRET } } }
+	end }
+	try("secret refresh", eventFrame._scripts.OnUpdate, eventFrame, 2)
+	local kept = false
+	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then kept = true end end
+	print("quest: icon kept while the data is secret", kept)
+	env.issecretvalue = nil
+
+	-- Questie as a helper. The game says the mob matters, the tooltip shows only a finished
+	-- quest, and quest B's objective names an item ("Bundle of Hides"), not the mob.
+	local function PlateCount()
+		try("questie plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_REMOVED", "nameplate1")
+		try("questie plate", eventFrame._scripts.OnEvent, eventFrame, "NAME_PLATE_UNIT_ADDED", "nameplate1")
+		for _, f in ipairs(frames) do
+			if rawget(f, "unit") == "nameplate1" and f._shown then return true, rawget(f, "progressValue") end
+		end
+		return false, nil
+	end
+	local savedGetInfo, savedAddOns = env.C_QuestLog.GetInfo, env.C_AddOns
+	env.C_QuestLog.GetInfo = function() return { title = "Quest B", questID = 202, isHeader = false } end
+	env.C_QuestLog.GetNumQuestLogEntries = function() return 1 end
+	env.C_QuestLog.GetQuestObjectives = function() return { { text = "Bundle of Hides: 1/5", finished = false } } end
+	env.UnitGUID = function(unit) return unit == "player" and "Player-1" or "Creature-0-1-2-3-123-0" end
+	env.C_TooltipInfo = { GetUnit = function()
+		return { lines = { { type = 17, leftText = "Quest A" }, { type = 8, leftText = "Kobold Vermin slain: 3/3", completed = true } } }
+	end }
+	local questieOn = false
+	env.C_AddOns = { IsAddOnLoaded = function(name) return name == "Questie" and questieOn end }
+	local fakeQuestie = { lookupByKey = {
+		m_123 = { ["202 1"] = { questId = 202, objective = { Completed = false, Collected = 1, Needed = 5, Update = function() end } } },
+	} }
+	env.QuestieLoader = { ImportModule = function() return fakeQuestie end }
+	try("questie log", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
+	-- Installed but disabled on this character: not used (marked, no count).
+	local shownOff, countOff = PlateCount()
+	print("questie: disabled -> not used", shownOff and countOff == nil)
+	-- Loaded: its count fills the gap.
+	questieOn = true
+	local shownOn, countOn = PlateCount()
+	print("questie: loaded -> count from Questie", shownOn and countOn)
+	-- The game says "not related": Questie never overrules it.
+	env.C_QuestLog.UnitIsRelatedToActiveQuest = function() return false end
+	local shownNo = PlateCount()
+	print("questie: game's no wins", not shownNo)
+	env.C_QuestLog.UnitIsRelatedToActiveQuest = function() return true end
+	-- A broken Questie (odd entries, an Update that errors) must not break anything.
+	fakeQuestie.lookupByKey.m_123 = { odd = "text", ["202 1"] = { questId = 202, objective = {
+		Update = function() error("Questie inside changed") end,
+		Completed = false, Collected = "?", Needed = setmetatable({}, { __index = function() error("boom") end }) } } }
+	local shownBroken = PlateCount()
+	print("questie: broken data -> still marked, no error", shownBroken)
+	env.QuestieLoader = nil
+	env.C_AddOns, env.C_QuestLog.GetInfo = savedAddOns, savedGetInfo
+
+	-- "Hide while fighting it" (off by default): on, the mob fighting you loses its icon; when
+	-- the fight ends without a kill (threat gone), the icon comes back.
+	env.C_TooltipInfo = { GetUnit = function()
+		return { lines = { { type = 17, leftText = "Quest A" }, { type = 8, leftText = "Kobold Vermin slain: 2/8", completed = false } } }
+	end }
+	local threat = 2
+	env.UnitThreatSituation = function() return threat end
+	local shownDefault = PlateCount()
+	print("fight: default off -> icon stays", shownDefault)
+	profile.hideWhileFighting = true
+	try("fight threat", eventFrame._scripts.OnEvent, eventFrame, "UNIT_THREAT_LIST_UPDATE", "nameplate1")
+	local fightingShown = false
+	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then fightingShown = true end end
+	print("fight: on -> hidden while fighting", not fightingShown)
+	threat = nil
+	try("fight over", eventFrame._scripts.OnEvent, eventFrame, "PLAYER_REGEN_ENABLED")
+	local back = false
+	for _, f in ipairs(frames) do if rawget(f, "unit") == "nameplate1" and f._shown then back = true end end
+	print("fight: survived -> icon back", back)
+	profile.hideWhileFighting = false
+	env.UnitThreatSituation = nil
+
+	-- "Warn about high-level quests" (on by default): quest level 20, player level 10 -> red;
+	-- player level 18 (2 below) -> normal colour.
+	local playerLevel = 10
+	env.UnitLevel = function() return playerLevel end
+	env.C_QuestLog.GetInfo = function() return { title = "Quest A", questID = 101, isHeader = false, level = 20 } end
+	env.C_QuestLog.GetNumQuestLogEntries = function() return 1 end
+	try("high level log", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
+	local function IconGreen()
+		PlateCount()
+		for _, f in ipairs(frames) do
+			if rawget(f, "unit") == "nameplate1" and f._shown then
+				local color = rawget(f, "icon") and rawget(rawget(f, "icon"), "_color")
+				return color and color[2]
+			end
+		end
+	end
+	-- One shade per level: 1 above = normal, 2 = light, 3 = deeper, 4+ = full red.
+	local shades = {}
+	for _, gap in ipairs({ 1, 2, 3, 4, 10 }) do
+		playerLevel = 20 - gap
+		try("level up", eventFrame._scripts.OnEvent, eventFrame, "PLAYER_LEVEL_UP")
+		shades[#shades + 1] = IconGreen() or 1
+	end
+	print("level: green per gap 1/2/3/4/10", table.concat(shades, " "))
+	print("level: shades step down, full red from 4", shades[1] == 1 and shades[2] < 1 and shades[3] < shades[2]
+		and shades[4] < shades[3] and shades[5] == shades[4])
+	env.C_QuestLog.GetInfo = savedGetInfo
 	env.C_TooltipInfo = nil
 	env.C_QuestLog.GetNumQuestLogEntries = function() return 0 end
 	env.UnitExists = function() return false end
@@ -276,7 +410,7 @@ local db = env.CSCoderQuestIndicatorDB
 local names = {}
 for name in pairs(db.profiles) do names[#names + 1] = name end
 print("profiles:", table.concat(names, ", "), "| char ->", db.chars["Tester - Realm"], "| language:", db.language)
-local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1, CreateColor = 1, IsInInstance = 1, SettingsPanel = 1, InterfaceOptionsFrame = 1, HideUIPanel = 1 }
+local known = { IsMouseButtonDown = 1, IsShiftKeyDown = 1, GetAddOnMetadata = 1, GetQuestLogTitle = 1, GetNumQuestLogEntries = 1, C_TooltipInfo = 1, UnitIsGameObject = 1, C_AddOns = 1, IsAddOnLoaded = 1, InterfaceOptions_AddCategory = 1, InterfaceOptionsFrame_OpenToCategory = 1, CSCoderQuestIndicatorDB = 1, CSCoderOptionsParent = 1, CreateColor = 1, IsInInstance = 1, SettingsPanel = 1, InterfaceOptionsFrame = 1, HideUIPanel = 1, issecretvalue = 1, issecrettable = 1, UnitGUID = 1 }
 local unexpected = {}
 for k in pairs(missing) do if not known[k] then unexpected[#unexpected + 1] = k end end
 print("unexpected nil globals:", #unexpected == 0 and "none" or table.concat(unexpected, ", "))

@@ -1179,17 +1179,56 @@ for code, texts in pairs(landing) do
 	locales[code].LANDING_TEXT, locales[code].LANDING_OPEN = texts[1], texts[2]
 end
 
--- Hide in dungeons and raids (on by default).
+-- Instances: always off (a note with an info icon, not a switch). The tip says why.
 local hideInstances = {
-	enUS = { "Hide in instanced content (dungeons and raids)", "No icons inside dungeons and raids; they come back when you leave." },
-	ptBR = { "Esconder em conteúdo instanciado (masmorras e raides)", "Nenhum ícone dentro de masmorras e raides; eles voltam quando você sai." },
-	esES = { "Ocultar en contenido instanciado (mazmorras y bandas)", "Sin iconos dentro de mazmorras y bandas; vuelven al salir." },
-	deDE = { "In instanzierten Inhalten ausblenden (Dungeons und Schlachtzüge)", "Keine Symbole in Dungeons und Schlachtzügen; sie kommen zurück, wenn du sie verlässt." },
-	frFR = { "Masquer en contenu instancié (donjons et raids)", "Aucune icône dans les donjons et les raids ; elles reviennent quand vous en sortez." },
-	itIT = { "Nascondi nei contenuti istanziati (spedizioni e incursioni)", "Nessuna icona dentro spedizioni e incursioni; tornano quando esci." },
+	enUS = { "Unavailable in instances", "Inside dungeons, raids and other instances, the game locks nameplates and quest information so no addon can read them. That is a limit of the game, not of this addon: Questie hides its nameplate icons there too.\n\nThe icons come back as soon as you leave." },
+	ptBR = { "Indisponível em instâncias", "Dentro de masmorras, raides e outras instâncias, o jogo bloqueia as nameplates e as informações de missão, e nenhum addon consegue lê-las. É um limite do jogo, não deste addon: o Questie também esconde os ícones dele lá.\n\nOs ícones voltam assim que você sai." },
+	esES = { "No disponible en instancias", "Dentro de mazmorras, bandas y otras instancias, el juego bloquea las placas de nombre y la información de misiones, y ningún addon puede leerlas. Es un límite del juego, no de este addon: Questie también oculta allí sus iconos.\n\nLos iconos vuelven en cuanto sales." },
+	deDE = { "In Instanzen nicht verfügbar", "In Dungeons, Schlachtzügen und anderen Instanzen sperrt das Spiel Namensplaketten und Questinformationen, sodass kein Addon sie lesen kann. Das ist eine Grenze des Spiels, nicht dieses Addons: Auch Questie blendet seine Symbole dort aus.\n\nDie Symbole kommen zurück, sobald du die Instanz verlässt." },
+	frFR = { "Indisponible en instance", "Dans les donjons, raids et autres instances, le jeu verrouille les barres de nom et les informations de quête : aucun addon ne peut les lire. C'est une limite du jeu, pas de cet addon : Questie y masque aussi ses icônes.\n\nLes icônes reviennent dès que vous sortez." },
+	itIT = { "Non disponibile nelle istanze", "Dentro spedizioni, incursioni e altre istanze, il gioco blocca le targhette e le informazioni delle missioni: nessun addon può leggerle. È un limite del gioco, non di questo addon: anche Questie lì nasconde le sue icone.\n\nLe icone tornano appena esci." },
 }
 for code, texts in pairs(hideInstances) do
 	locales[code].HIDE_INSTANCES, locales[code].HIDE_INSTANCES_TIP = texts[1], texts[2]
+end
+
+-- Hide a mob's icon while you fight it (off by default).
+local hideFighting = {
+	enUS = { "Hide during the fight", "A mob that is fighting you loses its icon. If it survives (you run away or it resets), the icon comes back." },
+	ptBR = { "Ocultar durante a luta", "Um mob que está lutando com você perde o ícone. Se ele sobreviver (você foge ou ele reseta), o ícone volta." },
+	esES = { "Ocultar durante la lucha", "Un enemigo que está luchando contigo pierde su icono. Si sobrevive (huyes o se reinicia), el icono vuelve." },
+	deDE = { "Im Kampf ausblenden", "Ein Gegner, der gegen dich kämpft, verliert sein Symbol. Überlebt er (du fliehst oder er setzt sich zurück), kommt das Symbol zurück." },
+	frFR = { "Masquer pendant le combat", "Un monstre qui vous combat perd son icône. S'il survit (vous fuyez ou il se réinitialise), l'icône revient." },
+	itIT = { "Nascondi durante il combattimento", "Un nemico che ti sta combattendo perde la sua icona. Se sopravvive (scappi o si resetta), l'icona torna." },
+}
+for code, texts in pairs(hideFighting) do
+	locales[code].HIDE_FIGHTING, locales[code].HIDE_FIGHTING_TIP = texts[1], texts[2]
+end
+
+-- Red icon for quests well above your level (on by default).
+local highLevel = {
+	enUS = { "Level alert", "The icon turns red when the quest is above your level: light red at 2 levels above, red at 3, full red at 4 or more." },
+	ptBR = { "Alerta de nível", "O ícone fica vermelho quando a missão está acima do seu nível: vermelho claro com 2 níveis acima, vermelho com 3 e vermelho total com 4 ou mais." },
+	esES = { "Alerta de nivel", "El icono se vuelve rojo cuando la misión está por encima de tu nivel: rojo claro con 2 niveles más, rojo con 3 y rojo intenso con 4 o más." },
+	deDE = { "Stufenwarnung", "Das Symbol wird rot, wenn die Quest über deiner Stufe liegt: hellrot bei 2 Stufen darüber, rot bei 3, tiefrot ab 4." },
+	frFR = { "Alerte de niveau", "L'icône devient rouge quand la quête est au-dessus de votre niveau : rouge clair à 2 niveaux de plus, rouge à 3, rouge vif à 4 ou plus." },
+	itIT = { "Avviso di livello", "L'icona diventa rossa quando la missione è sopra il tuo livello: rosso chiaro a 2 livelli sopra, rosso a 3, rosso pieno da 4 in su." },
+}
+for code, texts in pairs(highLevel) do
+	locales[code].HIGH_LEVEL, locales[code].HIGH_LEVEL_TIP = texts[1], texts[2]
+end
+
+-- Setup guide page: combat and warnings.
+local wizardExtra = {
+	enUS = { "Extras", "Two small helpers. You can change both later in the options." },
+	ptBR = { "Extras", "Dois pequenos ajudantes. Você pode mudar os dois depois nas opções." },
+	esES = { "Extras", "Dos pequeñas ayudas. Puedes cambiar ambas más tarde en las opciones." },
+	deDE = { "Extras", "Zwei kleine Helfer. Du kannst beide später in den Optionen ändern." },
+	frFR = { "Extras", "Deux petites aides. Vous pourrez changer les deux plus tard dans les options." },
+	itIT = { "Extra", "Due piccoli aiuti. Puoi cambiarli entrambi più tardi nelle opzioni." },
+}
+for code, texts in pairs(wizardExtra) do
+	locales[code].WIZ_EXTRA_TITLE, locales[code].WIZ_EXTRA_TEXT = texts[1], texts[2]
 end
 
 -- What's new (shown once after updating): v1.2.2, final list.
@@ -1279,3 +1318,15 @@ local perf = {
 for code, text in pairs(perf) do
 	locales[code].NEWS_TEXT = locales[code].NEWS_TEXT .. "\n|cffffd200•|r " .. text
 end
+
+-- What's new (shown once after updating): v1.2.4. Replaces the 1.2.3 list.
+local B = "|cffffd200•|r "
+local news124 = {
+	enUS = B .. "|cffffd200Level alert|r: the icon turns red for quests above your level, deeper red the higher they are.\n" .. B .. "|cffffd200Hide during the fight|r (off by default): a mob fighting you loses its icon, back if it survives.\n" .. B .. "With Questie active, its data fills in the count for drops the game doesn't show. Without Questie nothing changes.\n" .. B .. "Icons are always off in dungeons and raids: the game locks that information there (the options explain it).\n" .. B .. "Fix: in a group, a party member's objectives no longer mark mobs for you.\n" .. B .. "Fix: no more errors when the game hides quest data, e.g. on quest items in combat.\n" .. B .. "Lighter while questing, especially in groups and crowded areas.",
+	ptBR = B .. "|cffffd200Alerta de nível|r: o ícone fica vermelho em missões acima do seu nível, mais forte quanto mais alta a missão.\n" .. B .. "|cffffd200Ocultar durante a luta|r (desligado por padrão): um mob lutando com você perde o ícone, que volta se ele sobreviver.\n" .. B .. "Com o Questie ativo, os dados dele completam a contagem de drops que o jogo não mostra. Sem o Questie nada muda.\n" .. B .. "Os ícones ficam sempre desligados em masmorras e raides: o jogo bloqueia essas informações lá (as opções explicam).\n" .. B .. "Correção: em grupo, os objetivos de um colega não marcam mais mobs para você.\n" .. B .. "Correção: sem erros quando o jogo esconde dados de missão, como em itens de missão durante o combate.\n" .. B .. "Mais leve durante as missões, principalmente em grupo e em áreas lotadas.",
+	esES = B .. "|cffffd200Alerta de nivel|r: el icono se vuelve rojo en misiones por encima de tu nivel, más intenso cuanto más alta sea.\n" .. B .. "|cffffd200Ocultar durante la lucha|r (desactivado por defecto): un enemigo que lucha contigo pierde su icono, que vuelve si sobrevive.\n" .. B .. "Con Questie activo, sus datos completan el contador de botines que el juego no muestra. Sin Questie no cambia nada.\n" .. B .. "Los iconos siempre se desactivan en mazmorras y bandas: el juego bloquea esa información allí (las opciones lo explican).\n" .. B .. "Corrección: en grupo, los objetivos de un compañero ya no marcan enemigos para ti.\n" .. B .. "Corrección: sin errores cuando el juego oculta datos de misiones, como en objetos de misión durante el combate.\n" .. B .. "Más ligero mientras haces misiones, sobre todo en grupo y en zonas abarrotadas.",
+	deDE = B .. "|cffffd200Stufenwarnung|r: Das Symbol wird bei Quests über deiner Stufe rot, umso kräftiger, je höher sie sind.\n" .. B .. "|cffffd200Im Kampf ausblenden|r (standardmäßig aus): Ein Gegner, der gegen dich kämpft, verliert sein Symbol; es kommt zurück, wenn er überlebt.\n" .. B .. "Mit aktivem Questie ergänzen seine Daten den Zähler für Beute, die das Spiel nicht zeigt. Ohne Questie ändert sich nichts.\n" .. B .. "In Dungeons und Schlachtzügen sind die Symbole immer aus: Das Spiel sperrt diese Informationen dort (die Optionen erklären es).\n" .. B .. "Korrektur: In einer Gruppe markieren die Ziele eines Mitspielers keine Gegner mehr für dich.\n" .. B .. "Korrektur: Keine Fehler mehr, wenn das Spiel Questdaten verbirgt, z. B. bei Questgegenständen im Kampf.\n" .. B .. "Leichter beim Questen, besonders in Gruppen und vollen Gebieten.",
+	frFR = B .. "|cffffd200Alerte de niveau|r : l'icône devient rouge pour les quêtes au-dessus de votre niveau, plus vive quand elles sont plus hautes.\n" .. B .. "|cffffd200Masquer pendant le combat|r (désactivé par défaut) : un monstre qui vous combat perd son icône, qui revient s'il survit.\n" .. B .. "Avec Questie actif, ses données complètent le compteur des butins que le jeu n'affiche pas. Sans Questie rien ne change.\n" .. B .. "Les icônes sont toujours désactivées dans les donjons et raids : le jeu y verrouille ces informations (les options l'expliquent).\n" .. B .. "Correction : en groupe, les objectifs d'un équipier ne marquent plus de monstres pour vous.\n" .. B .. "Correction : plus d'erreurs quand le jeu masque des données de quête, par exemple sur les objets de quête en combat.\n" .. B .. "Plus léger pendant les quêtes, surtout en groupe et dans les zones bondées.",
+	itIT = B .. "|cffffd200Avviso di livello|r: l'icona diventa rossa per le missioni sopra il tuo livello, più intensa quanto più sono alte.\n" .. B .. "|cffffd200Nascondi durante il combattimento|r (disattivato di base): un nemico che ti combatte perde l'icona, che torna se sopravvive.\n" .. B .. "Con Questie attivo, i suoi dati completano il contatore dei bottini che il gioco non mostra. Senza Questie non cambia nulla.\n" .. B .. "Le icone sono sempre disattivate in spedizioni e incursioni: lì il gioco blocca queste informazioni (le opzioni lo spiegano).\n" .. B .. "Correzione: in gruppo, gli obiettivi di un compagno non segnano più nemici per te.\n" .. B .. "Correzione: niente più errori quando il gioco nasconde i dati delle missioni, ad esempio sugli oggetti delle missioni in combattimento.\n" .. B .. "Più leggero durante le missioni, soprattutto in gruppo e nelle zone affollate.",
+}
+for code, text in pairs(news124) do locales[code].NEWS_TEXT = text end

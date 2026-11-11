@@ -7,7 +7,11 @@ $ErrorActionPreference = "Stop"
 
 $name = "CSCoder_QuestIndicator"
 $source = Split-Path -Parent $PSScriptRoot
-$addons = "D:\Games\Battlenet\World of Warcraft\_forever_\Interface\AddOns"
+# The game lives on a different drive on each dev PC: take the first one that has it.
+$addons = "C", "D", "E", "F", "G" |
+	ForEach-Object { "${_}:\Games\Battlenet\World of Warcraft\_forever_\Interface\AddOns" } |
+	Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $addons) { throw "WoW Forever AddOns folder not found" }
 $target = Join-Path $addons $name
 
 function Remove-Installed {

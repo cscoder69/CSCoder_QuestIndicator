@@ -1,5 +1,16 @@
 # CS.Coder - Quest Indicator
 
+## v1.2.4
+
+- **Level alert** (on by default): the icon turns red for quests above your level — light red at 2 levels above, red at 3, full red at 4 or more.
+- **Hide during the fight** (off by default): a mob that is fighting you loses its icon; it comes back if the mob survives.
+- **Questie as a helper**: when Questie is active, its data fills in the count for quest drops the game doesn't show. Without Questie (or with it disabled) nothing changes, and the game's own answer always comes first.
+- Icons are now **always off in dungeons, raids and other instances**: WoW Forever locks nameplates and quest information there for every addon (Questie does the same). The options explain it next to an info icon.
+- New setup guide page, **Extras**, with the two new options.
+- **Fix:** in a group, a party member's unfinished objectives no longer mark mobs for you.
+- **Fix:** no more errors when the game hides quest data from addons (for example a quest item's tooltip during combat); the icon simply stays as it was.
+- **Lighter**: quest log updates are handled once per burst, nameplate changes are batched, sliders only redraw the look, and nothing runs while the addon is switched off.
+
 ## v1.2.3
 
 - **Fix:** a mob needed by two quests kept no icon once one quest was done (for example 3/3 done, the other still at 2/8). It is marked again, with the count of the quest that still needs it when that quest names the mob.

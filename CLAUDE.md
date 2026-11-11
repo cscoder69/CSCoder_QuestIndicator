@@ -1,6 +1,6 @@
 # CS.Coder - Quest Indicator — notes for Claude (and any dev)
 
-Read this first when working on the addon. Last updated 2026-11-10 (v1.2.3 published).
+Read this first when working on the addon. Last updated 2026-11-11 (v1.2.4 published).
 
 ## Working with the user
 - Chat in **Brazilian Portuguese**; code, comments, commits, docs and in-game text in **English**.
@@ -30,7 +30,9 @@ a Classic base with modern APIs (C_NamePlate, C_TooltipInfo, C_QuestLog, Setting
 
 Install: the source folder lives in `D:\Games\CS.Coder\WoW Addons\CSCoder_QuestIndicator\` and is a
 **junction** inside `D:\Games\Battlenet\World of Warcraft\_forever_\Interface\AddOns\`, so edits are
-live in game after `/reload`.
+live in game after `/reload`. Second dev PC (notebook, set up 2026-11-11): source in
+`G:\Games\CS.Coder\WoW\CSCoder_QuestIndicator\`, game in `G:\Games\Battlenet\World of Warcraft\_forever_\`
+(same junction). Git/gh/LuaJIT installed with winget; LuaJIT at the same path as below.
 
 ## Code map (CSCoder_QuestIndicator.lua)
 - **Settings:** `DEFAULTS` = per-profile settings. Saved layout:
@@ -135,8 +137,47 @@ live in game after `/reload`.
 - **Sound volume** (`soundVolume`, 0-100): below 100% `PlaySoundAt` plays on the Dialog channel and
   sets `Sound_DialogVolume` for 3 s (original kept in `root.dialogVolume`, restored at login if the
   game closed meanwhile). At 100% it plays on Master.
-- **Hide in instanced content** (`hideInInstances`, on by default; the user's tester got errors in
-  dungeons). `UsablePlate(unit)` never returns forbidden plates; plates are measured outside instances only.
+- **Instances: always off, not an option (since 2026-11-11, user's decision).** WoW Forever makes
+  nameplates forbidden and unit/tooltip data *secret* inside instances; Questie switches its nameplate
+  icons off there too (`Questie.IsForever and IsInInstance()`). `InstanceHidden()` = any instance.
+  The old `hideInInstances` switch is gone; the Behavior section shows a note with an info icon whose
+  tooltip (`HIDE_INSTANCES_TIP`) says it is the game's limit. `UsablePlate(unit)` never returns
+  forbidden plates; plates are measured outside instances only.
+- **Secret values** (`Hidden.Value`, `Hidden.Table`, `Hidden.UNKNOWN`): Forever can hide values from
+  addons (`issecretvalue`); in the open world a quest object's tooltip turns secret in combat. Secrets
+  can't be compared/searched/used as keys, so detection tests them first and answers `Hidden.UNKNOWN`;
+  `Refresh`/`RefreshSoftObject` then leave the icon as it was.
+- **Questie as a helper (2026-11-11, user: "auxiliar, não substituir"):** `questLog.FromQuestie(unit)`
+  reads `QuestieTooltips.lookupByKey["m_"..npcId / "o_"..objectId]` (unfinished objectives of quests
+  in our log, count from `Collected/Needed`). Asked only where the game leaves a gap: the game says
+  related but the tooltip shows nothing open (after the quest-log name lookup), and the no-API /
+  no-tooltip fallbacks. A "no" from the game is never overruled. Only when Questie is LOADED (the
+  user has it installed but disabled on their main character). Everything pcall'd; mock covers
+  disabled / loaded / game's no / broken Questie.
+- **Hide while fighting it** (`hideWhileFighting`, OFF by default, user's request 2026-11-11): in
+  `Refresh`, a needed mob with `UnitThreatSituation("player", unit) ~= nil` loses its icon (plain
+  `HideIcon`, no check mark). `UNIT_THREAT_LIST_UPDATE` and `PLAYER_REGEN_ENABLED` (now `RefreshAll`)
+  bring it back at once when it survives. Behavior section (COL1, below Ready alert) and the setup
+  guide's page 4 "Combat and warnings". Side effect: a mob killed while hidden shows no check mark.
+- **Level alert** (`highLevelRed`, ON by default, 2026-11-11; labels renamed by the user: "Alerta de
+  nível", "Ocultar durante a luta", "Indisponível em instâncias", guide page "Extras"): a quest 2+
+  levels above the player tints the icon `KIND_TINT.high[gap]`, one clearly different shade per level
+  (user's spec): +2 light red, +3 red, +4 or more full red; over any other tint. Levels come from
+  the quest log (`quests.levelByTitle/levelByID`, filled in `RebuildQuestTitles`); detection returns
+  a 4th value `level` (`questLog.FromTitle/FromName/FromQuestie`) -> `ShowIcon(..., level)` ->
+  `f.questLevel`. `PLAYER_LEVEL_UP` restyles (`ApplyLook` after 1 s). Mobs marked without a known
+  quest get no level. Behavior section (COL1, under Hide while fighting) and the setup guide's new
+  page 4 "Combat and warnings" (`WIZ_EXTRA_*`, both options; "What to show" is back to 5 checks).
+- **Party rows:** in a group the tooltip lists each member's objectives under a `QuestPlayer` row;
+  `QuestStateFromLines` skips rows whose guid isn't the player's.
+- **Performance (2026-11-11):** quest-log events are batched (`later.questLog`, 0.1 s, one rebuild
+  per burst; `UNIT_QUEST_LOG_CHANGED` registered for "player" only), the quest-item check is one per
+  frame (`QueueSoft`), sliders call `ApplyLook` (look only) instead of `ApplySettings`, `CVAR_UPDATE`
+  ignores our own writes and stops after 20 re-applies in 10 s (`cvarGuard`), the bobber skips
+  hidden/completing icons and doesn't re-anchor the label, the 1 s recheck idles when the addon is off,
+  pooled icons `ClearAllPoints`. The main chunk is AT the 200-locals limit again: new main-chunk
+  helpers must go into existing tables (`questLog.FromName`, `cvarGuard.gateOpened`, `Hidden`) or
+  `do ... end` blocks.
 - **Bug reports (v1.2.3, released 2026-11-10):** `/cqi debug` (`ShowDebug`: versions, client, language, main switches,
   instance, plate cvars, other quest/nameplate addons, last errors) and a "Report a bug" button
   (issues URL), both in the copy window (`OpenShareWindow("copy", title, hint, text)`). Errors that
@@ -196,11 +237,28 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
   and volume, hide in instanced content (default on), forbidden-plate safety.
 - 1.2.3 (2026-11-10): two quests on one mob keep the mark, /cqi debug + Report a bug, error
   capture, name lookups cached per quest log scan, CHANGELOG.md for CurseForge, release check job.
+- 1.2.4 (2026-11-11, first release from the second notebook): level alert (red shades), hide during
+  the fight, Questie as a helper, instances always off (game's limit, info note), Extras guide page,
+  party-objective and secret-value fixes, event batching and other performance work.
+
+## URGENT — next task (user, 2026-11-11)
+- New settings tab **"Gameplay"** (a third tab next to Settings and Profiles) with **automatic quest
+  pickup**: when you talk to an NPC that has quests to give, accept all of them automatically.
+  Alternative/extra the user mentioned: a small button in the corner of the NPC's quest window
+  (gossip / quest greeting frame) that accepts all available quests with one click.
+  Notes for building it: events GOSSIP_SHOW / QUEST_GREETING / QUEST_DETAIL; available quests via
+  C_GossipInfo.GetAvailableQuests (or GetNumAvailableQuests / SelectAvailableQuest on greeting frames),
+  AcceptQuest() on QUEST_DETAIL; skip when a modifier key is held; don't fight Questie's own
+  auto-accept if it is on; mind repeatable/daily and quests that cost something. Ask the user for
+  short option names first (see memory: short labels).
 
 ## Ideas the user liked, not done yet
+- **From the Questie comparison (2026-11-11), not built yet:** icon by objective type (kill / loot /
+  interact, from `C_QuestLog.GetQuestObjectives` `type`), skip non-Creature GUIDs before the tooltip.
+  Also left for later: build the options window on first open instead of at load (`BuildPanel`).
 - **Ideas noted 2026-11-10 (user: "anota mas não execute"):** special glow when a quest has one
-  objective left; reddish warning for quests well above your level; hide a mob's icon while you
-  fight it (back if you leave combat without killing it); ground glow around quest items; search
+  objective left; ~~reddish warning for quests well above your level~~ (DONE 2026-11-11); ~~hide a mob's icon while you
+  fight it~~ (DONE 2026-11-11); ground glow around quest items; search
   box in the options; preview scenarios (daily, group, almost done, combat); undo the last change;
   all counts on a mob shared by several quests ("2/8 · 1/5"); translation help link on CurseForge.
 - **Ideas reviewed with the user on 2026-11-09 (after v1.2.2):**

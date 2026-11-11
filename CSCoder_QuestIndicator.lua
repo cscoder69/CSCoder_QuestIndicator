@@ -51,10 +51,11 @@ local DEFAULTS = {
 	minimap = true,      -- minimap button
 	minimapAngle = 220,  -- its position around the minimap (degrees)
 	sound = true,        -- play a sound when a quest objective completes
-	hideInInstances = true, -- no icons inside dungeons and raids
 	doneCheck = true,    -- an icon that stops being needed turns into a check mark, then fades
 	readyAlert = true,   -- chat line when every objective of a quest is done
 	minimapSummary = true, -- the minimap button's tooltip lists the open objectives
+	hideWhileFighting = false, -- a mob you are fighting loses its icon (back if it survives)
+	highLevelRed = true,  -- level alert: red icon for quests 2+ levels above you (deeper per level)
 	soundChoice = "coins", -- key in QUEST_SOUNDS
 	soundVolume = 100,   -- its volume in percent
 }
@@ -113,7 +114,10 @@ local GLOW_TEXTURE = "Interface\\Cooldown\\star4"
 local RECHECK_SECONDS = 1.0 -- tooltip data can arrive a moment after the plate appears
 local SOFT = "softinteract"  -- the game's interaction soft target (one world object)
 local FADE_ALPHA = 0.35
-local KIND_TINT = { daily = { 0.55, 0.8, 1 }, group = { 1, 0.5, 0.45 } }
+-- (high: the level alert, not a quest kind. One clearly different shade per level above you:
+-- 2 = light red, 3 = red, 4 or more = full red.)
+local KIND_TINT = { daily = { 0.55, 0.8, 1 }, group = { 1, 0.5, 0.45 },
+	high = { [2] = { 1, 0.68, 0.62 }, [3] = { 1, 0.4, 0.34 }, [4] = { 1, 0.12, 0.1 } } }
 -- Progress text formatting: the fonts every client ships, outlines and colours.
 local TEXT_FONTS = { friz = "Fonts\\FRIZQT__.TTF", arial = "Fonts\\ARIALN.TTF", skurri = "Fonts\\skurri.ttf", morpheus = "Fonts\\MORPHEUS.TTF" }
 local TEXT_FONT_ORDER = { "friz", "arial", "skurri", "morpheus" }
@@ -129,8 +133,9 @@ local root, db, charKey  -- saved variables, active profile, "Name - Realm"
 local L                   -- active language table
 local icons = {}          -- unit token -> icon frame
 local pool = {}           -- recycled icon frames
-local activeTitles = {}   -- quest title -> kind ("normal", "daily", "group")
-local kindByQuestID = {}  -- questID -> kind
+-- The quest log, by title and by questID: kind ("normal", "daily", "group") and level.
+-- (One table: the main chunk is at Lua's 200-locals limit.)
+local quests = { kindByTitle = {}, kindByID = {}, levelByTitle = {}, levelByID = {} }
 local inCombat = false
 
 -- Fonts shared by other addons (Plater, ElvUI, WeakAuras, Details... register theirs with
@@ -231,16 +236,18 @@ local function KindFromTag(questID)
 end
 
 local function RebuildQuestTitles()
-	wipe(activeTitles)
-	wipe(kindByQuestID)
+	wipe(quests.kindByTitle)
+	wipe(quests.kindByID)
+	wipe(quests.levelByTitle)
+	wipe(quests.levelByID)
 	local count = (C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetNumQuestLogEntries())
 		or (GetNumQuestLogEntries and GetNumQuestLogEntries()) or 0
 	for i = 1, count do
-		local title, isHeader, questID, kind = nil, nil, nil, "normal"
+		local title, isHeader, questID, kind, level = nil, nil, nil, "normal", nil
 		if C_QuestLog and C_QuestLog.GetInfo then
 			local info = C_QuestLog.GetInfo(i)
 			if info then
-				title, isHeader, questID = info.title, info.isHeader, info.questID
+				title, isHeader, questID, level = info.title, info.isHeader, info.questID, tonumber(info.level)
 				if (tonumber(info.frequency) or 0) > 0 then
 					kind = "daily"
 				elseif (tonumber(info.suggestedGroup) or 0) > 1 then
@@ -248,8 +255,8 @@ local function RebuildQuestTitles()
 				end
 			end
 		elseif GetQuestLogTitle then
-			local t, _, tag, header, _, _, frequency, id = GetQuestLogTitle(i)
-			title, isHeader, questID = t, header, id
+			local t, questLevel, tag, header, _, _, frequency, id = GetQuestLogTitle(i)
+			title, isHeader, questID, level = t, header, id, tonumber(questLevel)
 			if frequency == true or (tonumber(frequency) or 0) > 0 then
 				kind = "daily"
 			elseif (type(tag) == "number" and tag > 1) or (type(tag) == "string" and tag ~= "") then
@@ -258,14 +265,16 @@ local function RebuildQuestTitles()
 		end
 		if title and not isHeader then
 			if kind == "normal" then kind = KindFromTag(questID) or kind end
-			activeTitles[title] = kind
-			if questID then kindByQuestID[questID] = kind end
+			quests.kindByTitle[title] = kind
+			quests.levelByTitle[title] = level
+			if questID then quests.kindByID[questID] = kind; quests.levelByID[questID] = level end
 		end
 	end
 end
 
+-- The quest kind for a title, and its level as a second value (nil when unknown).
 local function KindOf(title)
-	return (title and activeTitles[title]) or "normal"
+	return (title and quests.kindByTitle[title]) or "normal", title and quests.levelByTitle[title]
 end
 
 -- "Kobold Vermin slain: 3/10" or "3/10 Kobold Vermin": true while the left number is below the right.
@@ -282,24 +291,51 @@ local function ProgressText(text)
 	return text:match("(%d+%%)")
 end
 
+-- WoW Forever can hide values from addons ("secret values"): inside instances nearly everything,
+-- and in the open world a quest object's tooltip during combat. A secret can't be compared,
+-- searched or used as a table key (that raises an error), so values are tested first. Detection
+-- then answers Hidden.UNKNOWN and the icon is left as it was until the game shows the data again.
+-- (One table, not three locals: the main chunk is near Lua's 200-locals limit.)
+local Hidden = { UNKNOWN = "unknown" }
+function Hidden.Value(value)
+	return issecretvalue ~= nil and issecretvalue(value) or false
+end
+function Hidden.Table(value)
+	return not Hidden.Value(value) and type(value) == "table" and not (issecrettable and issecrettable(value))
+end
+
 -- Reads tooltip lines (TooltipInfo data or plain strings) and answers: true = still needed,
--- false = quest-related but finished, nil = not quest-related. Then the quest title and the
--- progress of the first unfinished objective ("3/10"), when there is one.
+-- false = quest-related but finished, nil = not quest-related, Hidden.UNKNOWN = the game hides them.
+-- Then the quest title and the progress of the first unfinished objective ("3/10").
+-- In a group the tooltip also lists each member's progress, under a row with their name
+-- (QuestPlayer): those objectives are theirs, not ours, and are skipped.
 local function QuestStateFromLines(lines)
 	local lineTypes = Enum and Enum.TooltipDataLineType
 	local objectiveType = lineTypes and lineTypes.QuestObjective
 	local titleType = lineTypes and lineTypes.QuestTitle
-	local sawQuest, title = false, nil
+	local playerType = lineTypes and lineTypes.QuestPlayer
+	local sawQuest, title, others = false, nil, false
 	for _, line in ipairs(lines) do
-		local text = type(line) == "table" and (line.leftText or "") or line
-		local lineType = type(line) == "table" and line.type or nil
-		if objectiveType and lineType == objectiveType then
-			sawQuest = true
-			if line.completed == false then return true, title, ProgressText(text) end
-			if line.completed == nil and ProgressUnfinished(text) then return true, title, ProgressText(text) end
-		elseif (titleType and lineType == titleType) or activeTitles[text] then
-			sawQuest, title = true, text
-		elseif sawQuest and ProgressUnfinished(text) then
+		if Hidden.Value(line) then return Hidden.UNKNOWN end
+		local text, lineType, completed = line, nil, nil
+		if type(line) == "table" then
+			if not Hidden.Table(line) then return Hidden.UNKNOWN end
+			text, lineType, completed = line.leftText, line.type, line.completed
+			if Hidden.Value(text) or Hidden.Value(lineType) or Hidden.Value(completed) then return Hidden.UNKNOWN end
+			text = text or ""
+		end
+		if playerType and lineType == playerType then
+			local guid = line.guid
+			others = Hidden.Value(guid) or guid ~= UnitGUID("player")
+		elseif objectiveType and lineType == objectiveType then
+			if not others then
+				sawQuest = true
+				if completed == false then return true, title, ProgressText(text) end
+				if completed == nil and ProgressUnfinished(text) then return true, title, ProgressText(text) end
+			end
+		elseif (titleType and lineType == titleType) or quests.kindByTitle[text] then
+			sawQuest, title, others = true, text, false
+		elseif sawQuest and not others and ProgressUnfinished(text) then
 			return true, title, ProgressText(text)
 		end
 	end
@@ -310,22 +346,30 @@ end
 local function ByTooltipInfo(unit)
 	if not (C_TooltipInfo and C_TooltipInfo.GetUnit) then return nil end
 	local data = C_TooltipInfo.GetUnit(unit)
-	if not (data and data.lines) then return nil end
-	return QuestStateFromLines(data.lines)
+	if Hidden.Value(data) then return Hidden.UNKNOWN end
+	if not Hidden.Table(data) then return nil end
+	local lines = data.lines
+	if Hidden.Value(lines) or (lines ~= nil and not Hidden.Table(lines)) then return Hidden.UNKNOWN end
+	if not lines then return nil end
+	return QuestStateFromLines(lines)
 end
 
 local scanner = CreateFrame("GameTooltip", ADDON .. "Scanner", nil, "GameTooltipTemplate")
-scanner:SetOwner(WorldFrame, "ANCHOR_NONE")
+scanner.lines = {}
 
 local function ByTooltipScan(unit)
+	-- A hidden tooltip can lose its owner and then shows no lines: set it on every scan.
+	scanner:SetOwner(WorldFrame, "ANCHOR_NONE")
 	scanner:ClearLines()
 	scanner:SetUnit(unit)
-	local lines = {}
+	local scanLines = scanner.lines
+	wipe(scanLines)
 	for i = 2, scanner:NumLines() do
 		local fs = _G[ADDON .. "ScannerTextLeft" .. i]
-		lines[#lines + 1] = fs and fs:GetText() or ""
+		scanLines[#scanLines + 1] = fs and fs:GetText() or ""
 	end
-	local state, title, progress = QuestStateFromLines(lines)
+	local state, title, progress = QuestStateFromLines(scanLines)
+	if state == Hidden.UNKNOWN then return Hidden.UNKNOWN end
 	return state == true, title, progress
 end
 
@@ -342,57 +386,129 @@ local questLog = { summary = {}, completedAt = -100, byName = {} }
 -- scan), so a crowded area with a full quest log stays light: one search per mob name, not one
 -- per nameplate every second.
 local function ObjectiveKindForName(name)
-	if not name or name == "" then return nil end
+	if Hidden.Value(name) or type(name) ~= "string" or name == "" then return nil end
 	name = name:lower()
 	local known = questLog.byName[name]
 	if known == nil then
 		known = false
 		for _, objective in ipairs(objectiveTexts) do
 			if objective.text:find(name, 1, true) then
-				known = { kind = objective.kind, progress = ProgressText(objective.text) }
+				known = { kind = objective.kind, progress = ProgressText(objective.text), level = objective.level }
 				break
 			end
 		end
 		questLog.byName[name] = known
 	end
-	if known then return known.kind, known.progress end
+	if known then return known.kind, known.progress, known.level end
 	return nil
 end
 
--- Returns: still needed?, quest kind, progress text.
+-- The unit's name in an unfinished objective of the quest log: needed?, kind, progress, level.
+function questLog.FromName(unit)
+	local kind, progress, level = ObjectiveKindForName((UnitName(unit)))
+	return kind ~= nil, kind, progress, level
+end
+
+-- Questie as a helper, never a replacement: the game's answers always come first and a "no" from
+-- the game is never overruled. Questie is only asked where the game leaves a gap: which quest and
+-- what count when the game says a mob matters but its tooltip shows nothing open (often a drop),
+-- or whether a mob matters at all on clients where the game can't tell.
+-- Only when Questie is actually LOADED (installed but disabled on this character = not there).
+-- Read-only and fully guarded: no Questie, or a Questie whose insides changed, simply answers nil.
+do
+	local tooltips -- Questie's QuestieTooltips module, once found
+	local function Module()
+		if tooltips then return tooltips end
+		local loaded = (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("Questie"))
+			or (IsAddOnLoaded and IsAddOnLoaded("Questie"))
+		if not loaded or type(QuestieLoader) ~= "table" or type(QuestieLoader.ImportModule) ~= "function" then return nil end
+		local module = QuestieLoader:ImportModule("QuestieTooltips")
+		if type(module) == "table" and type(module.lookupByKey) == "table" then tooltips = module end
+		return tooltips
+	end
+
+	-- The first unfinished objective Questie has for this mob/object, in a quest of our log.
+	local function Read(key)
+		local module = Module()
+		local list = module and module.lookupByKey[key]
+		if type(list) ~= "table" then return nil end
+		for _, entry in pairs(list) do
+			local objective = type(entry) == "table" and entry.objective
+			local quest = type(entry) == "table" and entry.questId
+			-- Only objectives (quest starters have no objective) of quests still in our log.
+			if type(objective) == "table" and quest and quests.kindByID[quest] then
+				if type(objective.Update) == "function" and not (objective.IsSourceItem or objective.IsRequiredSourceItem) then
+					pcall(objective.Update, objective)
+				end
+				if not objective.Completed then
+					local have, need = tonumber(objective.Collected), tonumber(objective.Needed)
+					local progress = (have and need and need > 0) and (have .. "/" .. need) or nil
+					return quests.kindByID[quest], progress, quests.levelByID[quest]
+				end
+			end
+		end
+		return nil
+	end
+
+	-- Returns: needed?, kind, progress (nil when Questie isn't loaded or doesn't know the unit).
+	function questLog.FromQuestie(unit)
+		local guid = UnitGUID and UnitGUID(unit)
+		if Hidden.Value(guid) or type(guid) ~= "string" then return nil end
+		-- "Creature-0-server-instance-zone-npcID-spawn"; objects are "GameObject-...".
+		local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
+		local prefix = (kind == "Creature" or kind == "Vehicle") and "m_" or (kind == "GameObject" and "o_")
+		if not (prefix and id) then return nil end
+		local ok, questKind, progress, level = pcall(Read, prefix .. id)
+		if ok and questKind then return true, questKind, progress, tonumber(level) end
+		return nil
+	end
+end
+
+-- Needed, with the quest kind, progress and level of the quest named by a tooltip title.
+function questLog.FromTitle(title, progress)
+	local kind, level = KindOf(title)
+	return true, kind, progress, level
+end
+
+-- Returns: still needed? (Hidden.UNKNOWN while the game hides the data), quest kind, progress
+-- text, quest level (nil when unknown).
 local function IsQuestMob(unit)
 	if not UnitExists(unit) or UnitIsPlayer(unit) or UnitIsDead(unit) then return false end
 	if UnitIsFriend("player", unit) and not UnitCanAttack("player", unit) then return false end
+	local related
 	if C_QuestLog and C_QuestLog.UnitIsRelatedToActiveQuest then
-		local ok, related = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, unit)
-		if ok and related ~= nil then
-			if not related then return false end
-			local state, title, progress = ByTooltipInfo(unit)
-			if state ~= false then return true, KindOf(title), progress end
-			-- Every quest the tooltip lists is done, yet the game says the mob still matters:
-			-- another quest needs it without showing in the tooltip (often a drop). Its name in
-			-- an unfinished objective of the quest log gives that quest's count.
-			local kind, logProgress = ObjectiveKindForName(UnitName(unit))
-			if kind then return true, kind, logProgress end
-			-- No objective names it (an item with another name): trust the game and mark the mob,
-			-- without a count. Players who collect many quests hit this often; a missing mark
-			-- is worse than a count we can't know.
-			return true, "normal", nil
-		end
+		local ok, value = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, unit)
+		if ok then related = value end
 	end
+	if Hidden.Value(related) then return Hidden.UNKNOWN end
+	if related == false then return false end
 	local state, title, progress = ByTooltipInfo(unit)
-	if state == true then return true, KindOf(title), progress end
-	if state == false then
-		-- The tooltip's quests are done; another quest may still name this mob (see above).
-		local kind, logProgress = ObjectiveKindForName(UnitName(unit))
-		return kind ~= nil, kind, logProgress
+	if state == Hidden.UNKNOWN then return Hidden.UNKNOWN end
+	if state == true then return questLog.FromTitle(title, progress) end
+	if related then
+		-- The tooltip shows nothing open, yet the game says the mob still matters: another quest
+		-- needs it without showing in the tooltip (often a drop). Its name in an unfinished
+		-- objective of the quest log gives that quest's count; Questie (if loaded) knows drops by
+		-- their mob even when the item is named nothing like it.
+		local found, kind, extra, level = questLog.FromName(unit)
+		if found then return true, kind, extra, level end
+		found, kind, extra, level = questLog.FromQuestie(unit)
+		if found then return true, kind, extra, level end
+		-- No objective names it (an item with another name): trust the game and mark the mob,
+		-- without a count. Players who collect many quests hit this often; a missing mark
+		-- is worse than a count we can't know.
+		return true, "normal", nil
 	end
+	-- No answer from the game (older clients). The tooltip's quests are done: another quest may
+	-- still name this mob.
+	if state == false then return questLog.FromName(unit) end
 	local scanned, scannedTitle, scannedProgress = ByTooltipScan(unit)
-	if scanned then return true, KindOf(scannedTitle), scannedProgress end
-	-- Last resort, for clients whose tooltips show no quest lines: the mob's name in an
-	-- unfinished objective of the quest log.
-	local kind, logProgress = ObjectiveKindForName(UnitName(unit))
-	return kind ~= nil, kind, logProgress
+	if scanned == Hidden.UNKNOWN then return Hidden.UNKNOWN end
+	if scanned then return questLog.FromTitle(scannedTitle, scannedProgress) end
+	-- Last resort, for clients whose tooltips show no quest lines: Questie, then the quest log.
+	local found, kind, extra, level = questLog.FromQuestie(unit)
+	if found then return true, kind, extra, level end
+	return questLog.FromName(unit)
 end
 
 ---------------------------------------------------------------------------------------------
@@ -410,26 +526,34 @@ end
 -- position and size (its X/Y are locked). Detached: X/Y from the nameplate. wave (0..1) is the
 -- float phase when it floats with the icon; the icon moves bounceHeight in its own scale, so the
 -- text moves bounceHeight * scale.
+-- full = true re-anchors the label too (styling); the float only moves the text frame, every
+-- frame, with the same single point (SetPoint replaces it, no ClearAllPoints needed).
 local ATTACH_GAP = 2
-local function PlaceText(f, wave)
+local function PlaceText(f, wave, full)
 	local text, label = f.text, f.text.label
 	local lift = wave * db.bounceHeight * (f.isObject and db.objectScale or db.scale)
-	text:ClearAllPoints()
-	label:ClearAllPoints()
+	if full then
+		text:ClearAllPoints()
+		label:ClearAllPoints()
+		label:SetPoint(db.progressAttach and "LEFT" or "CENTER")
+	end
 	if db.progressAttach then
-		label:SetPoint("LEFT")
 		text:SetPoint("LEFT", f, "RIGHT", ATTACH_GAP, lift)
 	else
-		label:SetPoint("CENTER")
 		text:SetPoint("CENTER", f.plate or f:GetParent(), "TOP", db.progressX, db.progressY + lift)
 	end
 end
 
 -- "style", "bounce" or "glow" for this icon: quest items with their own look use objectStyle,
--- objectBounce and objectGlow; everything else uses the shared setting.
-local function Look(f, key)
-	if f.isObject and db.objectOwnLook then return db["object" .. key:sub(1, 1):upper() .. key:sub(2)] end
-	return db[key]
+-- objectBounce and objectGlow; everything else uses the shared setting. (A fixed table: the
+-- float asks every frame.)
+local Look
+do
+	local OBJECT_LOOK = { style = "objectStyle", bounce = "objectBounce", glow = "objectGlow" }
+	function Look(f, key)
+		if f.isObject and db.objectOwnLook then return db[OBJECT_LOOK[key]] end
+		return db[key]
+	end
 end
 
 local function StyleIcon(f)
@@ -442,6 +566,12 @@ local function StyleIcon(f)
 		if sibling then style = sibling[kind] else tint = KIND_TINT[kind] end
 	end
 	f.icon:SetTexture(IconPath(style))
+	-- Level alert: a quest 2+ levels above you tints the icon red, a shade deeper per level up to
+	-- full red at 4+, over any other tint.
+	if db.highLevelRed and f.questLevel and UnitLevel then
+		local gap = f.questLevel - (UnitLevel("player") or 0)
+		if gap >= 2 then tint = KIND_TINT.high[math.min(gap, 4)] end
+	end
 	if tint then f.icon:SetVertexColor(tint[1], tint[2], tint[3]) else f.icon:SetVertexColor(1, 1, 1) end
 
 	local scale = f.isObject and db.objectScale or db.scale
@@ -485,7 +615,7 @@ local function StyleIcon(f)
 		label:SetTextColor(color[1], color[2], color[3])
 		label:SetText(shown)
 		text:SetScale(1 / scale)
-		PlaceText(f, 0)
+		PlaceText(f, 0, true)
 	end
 
 	local glow = Look(f, "glow")
@@ -608,12 +738,13 @@ local function CreateIcon()
 	return f
 end
 
-local function ShowIcon(unit, plate, kind, progress)
+local function ShowIcon(unit, plate, kind, progress, level)
 	kind = kind or "normal"
 	local f = icons[unit]
 	if f then
 		if f.completing then return end
-		if f.kind ~= kind or f.progressValue ~= progress then
+		if f.kind ~= kind or f.progressValue ~= progress or f.questLevel ~= level then
+			f.questLevel = level
 			local before = tonumber(tostring(f.progressValue):match("%d+"))
 			local now = tonumber(tostring(progress):match("%d+"))
 			f.kind, f.progressValue = kind, progress
@@ -627,7 +758,7 @@ local function ShowIcon(unit, plate, kind, progress)
 	end
 	f = table.remove(pool) or CreateIcon()
 	icons[unit] = f
-	f.unit, f.isObject, f.kind, f.progressValue = unit, unit == SOFT, kind, progress
+	f.unit, f.isObject, f.kind, f.progressValue, f.questLevel = unit, unit == SOFT, kind, progress, level
 	f:SetParent(plate)
 	f:SetFrameStrata("LOW")
 	AnchorIcon(f, plate)
@@ -642,8 +773,13 @@ local function HideIcon(unit)
 	icons[unit] = nil
 	f.pulse:Stop()
 	f.done:Stop()
+	f.pop:Stop()
+	f.textPop:Stop()
 	f.completing, f.onDone = nil, nil
 	f:Hide()
+	-- Let go of the plate completely: a pooled icon must not stay anchored to a plate the game
+	-- may later hand out as forbidden.
+	f:ClearAllPoints()
 	f:SetParent(UIParent)
 	f.unit, f.progressValue = nil, nil
 	f.text:Hide()
@@ -687,18 +823,26 @@ function UsablePlate(unit)
 	return plate
 end
 
--- Inside a dungeon or raid (party / raid instance), with "Hide in dungeons and raids" on.
+-- Inside any instance (dungeon, raid, battleground, arena, scenario). Always off there, not an
+-- option: WoW Forever makes nameplates forbidden and unit/tooltip data secret inside instances,
+-- so no addon can read or mark quest mobs there (Questie switches its nameplate icons off the
+-- same way). The options say so next to an info icon.
 local function InstanceHidden()
-	if not (db.hideInInstances and IsInInstance) then return false end
-	local inside, kind = IsInInstance()
-	return inside and (kind == "party" or kind == "raid") or false
+	return IsInInstance and IsInInstance() and true or false
 end
 
 local function Refresh(unit)
 	local plate = UsablePlate(unit)
 	if db.active and db.enabled and plate and not InstanceHidden() then
-		local needed, kind, progress = IsQuestMob(unit)
-		if needed then ShowIcon(unit, plate, kind, progress) return end
+		local needed, kind, progress, level = IsQuestMob(unit)
+		if needed == Hidden.UNKNOWN then return end -- hidden by the game for now: leave the icon as it is
+		-- "Hide while fighting it": the mob has you on its threat list. Not a check mark: it isn't
+		-- done. If it survives (you run, it resets) the threat ends and the icon comes back.
+		if needed and db.hideWhileFighting and UnitThreatSituation then
+			local ok, threat = pcall(UnitThreatSituation, "player", unit)
+			if ok and not Hidden.Value(threat) and threat ~= nil then HideIcon(unit) return end
+		end
+		if needed then ShowIcon(unit, plate, kind, progress, level) return end
 		if not UnitIsDead(unit) then HideOrComplete(unit) return end
 	end
 	HideIcon(unit)
@@ -714,6 +858,16 @@ local function RefreshAll()
 	for unit in pairs(icons) do
 		if not UsablePlate(unit) then HideIcon(unit) end
 	end
+end
+
+-- Only the look (size, position, float, glow, text): what sliders change. They fire on every
+-- frame of a drag, so no cvars, tooltips or gates here.
+local function ApplyLook()
+	for _, f in pairs(icons) do
+		AnchorIcon(f, f:GetParent())
+		StyleIcon(f)
+	end
+	if UpdatePreview then UpdatePreview() end
 end
 
 local function ApplySettings()
@@ -807,7 +961,7 @@ function RebuildObjectiveTexts()
 		for index, objective in ipairs(objectives or {}) do
 			local finished = objective.finished and true or false
 			if objective.text and not finished then
-				objectiveTexts[#objectiveTexts + 1] = { text = objective.text:lower(), kind = kindByQuestID[questID] or "normal" }
+				objectiveTexts[#objectiveTexts + 1] = { text = objective.text:lower(), kind = quests.kindByID[questID] or "normal", level = quests.levelByID[questID] }
 				open = open or {}
 				open[#open + 1] = objective.text
 			end
@@ -839,9 +993,13 @@ end
 local function IsQuestObject(unit)
 	if not (UnitIsGameObject and UnitIsGameObject(unit)) then return false end
 	local state, title, progress = ByTooltipInfo(unit)
-	if state ~= nil then return state, KindOf(title), progress end
-	local kind, logProgress = ObjectiveKindForName(UnitName(unit))
-	return kind ~= nil, kind, logProgress
+	if state == Hidden.UNKNOWN then return Hidden.UNKNOWN end -- objects' tooltips turn secret in combat
+	if state == true then return questLog.FromTitle(title, progress) end
+	if state == false then return false end
+	-- The tooltip says nothing: Questie (if loaded), then the quest log.
+	local found, kind, extra, level = questLog.FromQuestie(unit)
+	if found then return true, kind, extra, level end
+	return questLog.FromName(unit)
 end
 
 -- Cvars this addon depends on. Other addons (e.g. ForeverLootSparkles) change the same ones and
@@ -856,7 +1014,11 @@ local GATE_CVAR = "SoftTargetNameplateInteract" -- nameplate on the interaction 
 local WATCHED_CVARS = { softtargetinteract = true, softtargetnameplateinteract = true }
 for name in pairs(OBJECT_CVARS) do WATCHED_CVARS[name:lower()] = true end
 local pendingCVars       -- "apply" or "restore" once combat ends
-local gateOpenedByUs = false
+-- writing: our own SetCVar is running (its CVAR_UPDATE is ours, not another addon's).
+-- queued: a re-apply is already scheduled. recent/since: re-applies in the last few seconds,
+-- so two addons that keep undoing each other can't loop forever.
+-- gateOpened: the quest-object gate (see UpdateGate) was opened by this addon.
+local cvarGuard = { writing = false, queued = false, recent = 0, since = 0, gateOpened = false }
 
 local function GetCV(name)
 	local ok, value = pcall(C_CVar.GetCVar, name)
@@ -871,7 +1033,9 @@ local function SetCV(name, value, remember)
 		root.savedCVars = root.savedCVars or {}
 		if root.savedCVars[name] == nil then root.savedCVars[name] = current end
 	end
+	cvarGuard.writing = true
 	pcall(C_CVar.SetCVar, name, value)
+	cvarGuard.writing = false
 end
 
 function EnableObjectNameplates()
@@ -890,7 +1054,7 @@ end
 function RestoreObjectCVars()
 	if not (C_CVar and C_CVar.SetCVar) then return end
 	if InCombatLockdown() then pendingCVars = "restore"; return end
-	if gateOpenedByUs then gateOpenedByUs = false; SetCV(GATE_CVAR, 0) end
+	if cvarGuard.gateOpened then cvarGuard.gateOpened = false; SetCV(GATE_CVAR, 0) end
 	for name, value in pairs(root.savedCVars or {}) do pcall(C_CVar.SetCVar, name, value) end
 	root.savedCVars = nil
 end
@@ -907,10 +1071,10 @@ local function UpdateGate(isQuest)
 	if isQuest then
 		if tostring(GetCV(GATE_CVAR)) ~= "1" then
 			SetCV(GATE_CVAR, 1)
-			gateOpenedByUs = true
+			cvarGuard.gateOpened = true
 		end
-	elseif gateOpenedByUs then
-		gateOpenedByUs = false
+	elseif cvarGuard.gateOpened then
+		cvarGuard.gateOpened = false
 		local othersWantIt = IsLoaded("ForeverLootSparkles") and UnitExists(SOFT)
 			and ((UnitIsGameObject and UnitIsGameObject(SOFT)) or UnitIsDead(SOFT))
 		if not othersWantIt then SetCV(GATE_CVAR, 0) end
@@ -923,13 +1087,14 @@ function RefreshSoftObject()
 		HideIcon(SOFT)
 		return
 	end
-	local isQuest, kind, progress = false, nil, nil
-	if UnitExists(SOFT) then isQuest, kind, progress = IsQuestObject(SOFT) end
+	local isQuest, kind, progress, level = false, nil, nil, nil
+	if UnitExists(SOFT) then isQuest, kind, progress, level = IsQuestObject(SOFT) end
+	if isQuest == Hidden.UNKNOWN then return end -- hidden by the game for now: keep gate and icon as they are
 	UpdateGate(isQuest)
 	local plate = UsablePlate(SOFT)
 	if isQuest and plate then
 		if icons[SOFT] and icons[SOFT]:GetParent() ~= plate then HideIcon(SOFT) end
-		ShowIcon(SOFT, plate, kind, progress)
+		ShowIcon(SOFT, plate, kind, progress, level)
 	else
 		HideIcon(SOFT) -- the plate follows the gate; NAME_PLATE_UNIT_ADDED shows the icon
 	end
@@ -1363,7 +1528,7 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 				slider:SetValue(typed)
 				syncing = false
 				slider.Paint(typed)
-				ApplySettings()
+				ApplyLook()
 			end
 		end
 		ShowValue(db[settingKey])
@@ -1387,7 +1552,7 @@ local function AddSlider(parent, labelKey, settingKey, low, high, step, x, y, fo
 		if db[settingKey] == value then return end
 		db[settingKey] = value
 		UpdateLabel(value)
-		ApplySettings()
+		ApplyLook() -- sliders only change the look
 	end)
 	-- Shift + mouse wheel moves one step (fine tuning on the wide X/Y ranges); the plain wheel
 	-- keeps scrolling the settings page.
@@ -1835,7 +2000,8 @@ end
 ---------------------------------------------------------------------------------------------
 
 local function Bob(f, now)
-	if not Look(f, "bounce") then return end
+	-- Nothing to move: no float, the check mark fading out, or hidden in combat (alpha 0).
+	if f.completing or not Look(f, "bounce") or f:GetAlpha() == 0 then return end
 	-- One full up-and-down cycle takes 2 * bounceSpeed seconds; cosine eases both ends.
 	local period = 2 * db.bounceSpeed
 	local wave = (1 - math.cos((now + f.phase) * 2 * math.pi / period)) / 2
@@ -1969,7 +2135,7 @@ local ICON_KEYS = { "style", "bounce", "bounceHeight", "bounceSpeed", "glow", "g
 local PROGRESS_KEYS = { "progress", "objectProgress", "progressPulse", "progressAttach", "progressFloat", "progressSize", "progressFont",
 	"progressOutline", "progressColor", "progressFormat", "progressShadow", "progressX", "progressY" }
 local BEHAVIOR_KEYS = { "colorByType", "combat", "minimap", "minimapAngle", "sound", "soundChoice",
-	"soundVolume", "hideInInstances", "doneCheck", "readyAlert", "minimapSummary" }
+	"soundVolume", "doneCheck", "readyAlert", "minimapSummary", "hideWhileFighting", "highLevelRed" }
 
 local function ResetKeys(keys)
 	for _, key in ipairs(keys) do db[key] = DEFAULTS[key] end
@@ -2140,6 +2306,8 @@ local function BuildBehaviorTab(tab)
 		function() return db.combat end,
 		function(value) db.combat = value; UpdateCombatAlpha() end,
 		COL1 + 4, TOP - 100, COLUMN_DROPDOWN))
+	GateCheck(On.MobsOn, AddCheck(tab, "HIDE_FIGHTING", "HIDE_FIGHTING_TIP", "hideWhileFighting", COL1, TOP - 256))
+	GateCheck(On.AnyIconOn, AddCheck(tab, "HIGH_LEVEL", "HIGH_LEVEL_TIP", "highLevelRed", COL1, TOP - 304))
 
 	local languages = { "auto" }
 	for _, code in ipairs(ns.LANGUAGES) do languages[#languages + 1] = code end
@@ -2170,7 +2338,31 @@ local function BuildBehaviorTab(tab)
 	GateCheck(On.AddonOn, AddCheck(tab, "READY_ALERT", "READY_ALERT_TIP", "readyAlert", COL1, TOP - 208))
 	GateCheck(function() return db.minimap end,
 		AddCheck(tab, "MINIMAP_SUMMARY", "MINIMAP_SUMMARY_TIP", "minimapSummary", COL2, TOP - 210))
-	GateCheck(On.AnyIconOn, AddCheck(tab, "HIDE_INSTANCES", "HIDE_INSTANCES_TIP", "hideInInstances", COL2, TOP - 258))
+	-- Not a switch: icons are always off in instances (the game's limit, see InstanceHidden).
+	-- A note with an info icon whose tooltip explains why.
+	local info = CreateFrame("Frame", nil, tab)
+	info:SetSize(18, 18)
+	info:SetPoint("TOPLEFT", COL2 + 12, TOP - 266)
+	local disc = info:CreateTexture(nil, "ARTWORK")
+	disc:SetAllPoints()
+	disc:SetTexture(Skin.CIRCLE)
+	disc:SetVertexColor(1, 0.82, 0)
+	local letter = info:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	letter:SetPoint("CENTER", 0, 0)
+	letter:SetText("i")
+	letter:SetTextColor(0.1, 0.08, 0.05)
+	local label = info:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	label:SetPoint("LEFT", info, "RIGHT", 8, 0)
+	Loc(label, "HIDE_INSTANCES")
+	info:SetHitRectInsets(0, -260, -4, -4) -- hovering the text shows the tip too
+	info:EnableMouse(true)
+	info:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L.HIDE_INSTANCES, 1, 0.82, 0)
+		GameTooltip:AddLine(L.HIDE_INSTANCES_TIP, 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	info:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
 -- Profiles tab in the Ace3 layout players know from RareScanner and many others: intro, reset,
@@ -2334,7 +2526,7 @@ function ShowDebug()
 	Add("locale", GetLocale and GetLocale())
 	Add("language", root.language)
 	Add("profile", ActiveProfileName())
-	for _, key in ipairs({ "active", "enabled", "objects", "progress", "objectProgress", "hideInInstances", "sound", "soundVolume", "style", "anchor" }) do
+	for _, key in ipairs({ "active", "enabled", "objects", "progress", "objectProgress", "sound", "soundVolume", "style", "anchor" }) do
 		Add(key, db[key])
 	end
 	if IsInInstance then
@@ -2447,7 +2639,7 @@ local SETTINGS_SECTIONS = {
 	{ key = "TAB_DISPLAY", build = BuildDisplayTab, height = 258 },
 	{ key = "TAB_ICON", build = BuildIconTab, height = 312 },
 	{ key = "TAB_PROGRESS", build = BuildProgressTab, height = 340 },
-	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 316 },
+	{ key = "TAB_BEHAVIOR", build = BuildBehaviorTab, height = 388 },
 }
 local SECTION_GAP = 18
 local CONTENT_WIDTH = 600 -- until the scroll frame reports its real width
@@ -2867,6 +3059,12 @@ local function BuildWizard()
 	AddCheck(showPage, "PROGRESS_ITEMS", "PROGRESS_ITEMS_TIP", "objectProgress", 28, -276)
 	AddCheck(showPage, "SOUND", "SOUND_TIP", "sound", 28, -326)
 
+	-- 4. Combat and warnings.
+	local extraPage = NewPage()
+	AddWizardText(extraPage, "WIZ_EXTRA_TITLE", "WIZ_EXTRA_TEXT")
+	AddCheck(extraPage, "HIGH_LEVEL", "HIGH_LEVEL_TIP", "highLevelRed", 28, -126)
+	AddCheck(extraPage, "HIDE_FIGHTING", "HIDE_FIGHTING_TIP", "hideWhileFighting", 28, -204)
+
 	-- 5. Done.
 	local donePage = NewPage()
 	AddWizardText(donePage, "WIZ_DONE_TITLE", "WIZ_DONE_TEXT")
@@ -3076,11 +3274,39 @@ events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 events:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
 events:RegisterEvent("QUEST_LOG_UPDATE")
-events:RegisterEvent("UNIT_QUEST_LOG_CHANGED")
+-- Only the player's own quest log: party members' changes would rebuild it for nothing.
+if events.RegisterUnitEvent then
+	events:RegisterUnitEvent("UNIT_QUEST_LOG_CHANGED", "player")
+else
+	events:RegisterEvent("UNIT_QUEST_LOG_CHANGED")
+end
 events:RegisterEvent("PLAYER_REGEN_DISABLED")
 events:RegisterEvent("PLAYER_REGEN_ENABLED")
 pcall(events.RegisterEvent, events, "PLAYER_SOFT_INTERACT_CHANGED")
 pcall(events.RegisterEvent, events, "CVAR_UPDATE")
+pcall(events.RegisterEvent, events, "UNIT_THREAT_LIST_UPDATE") -- "hide while fighting it"
+pcall(events.RegisterEvent, events, "PLAYER_LEVEL_UP") -- "warn about high-level quests"
+
+-- Work that events ask for in bursts is done once, a moment later. The game fires
+-- QUEST_LOG_UPDATE several times per kill, loot or accept, and nameplates come and go in
+-- groups: one quest log rebuild and one quest item check per burst instead of one per event.
+-- (0.1 s stays well inside the 3 s window of the check mark.)
+local later = { questLog = false, soft = false, measure = false }
+local function FlushQuestLog()
+	later.questLog = false
+	if not db then return end
+	RebuildQuestTitles(); RebuildObjectiveTexts()
+	RefreshAll()
+end
+local function FlushSoft()
+	later.soft = false
+	if db then RefreshSoftObject() end
+end
+local function QueueSoft()
+	if later.soft then return end
+	later.soft = true
+	C_Timer.After(0, FlushSoft)
+end
 
 events:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
@@ -3106,16 +3332,19 @@ events:SetScript("OnEvent", function(_, event, arg1)
 	if event == "NAME_PLATE_UNIT_ADDED" then
 		if arg1 ~= SOFT then
 			Refresh(arg1)
-			-- Enemy plates are what the preview imitates; measure one per session once it is laid out.
-			if not plateMeasured and UnitCanAttack and UnitCanAttack("player", arg1) then
+			-- Enemy plates are what the preview imitates; measure one per session once it is laid
+			-- out (one at a time, and never inside instances, where plates can't be measured).
+			if not plateMeasured and not later.measure and not (IsInInstance and IsInInstance())
+				and UnitCanAttack and UnitCanAttack("player", arg1) then
+				later.measure = true
 				local unit = arg1
-				C_Timer.After(0.2, function() MeasurePlate(unit) end)
+				C_Timer.After(0.2, function() later.measure = false; MeasurePlate(unit) end)
 			end
 		end
-		RefreshSoftObject()
+		QueueSoft()
 	elseif event == "NAME_PLATE_UNIT_REMOVED" then
 		HideIcon(arg1)
-		RefreshSoftObject()
+		QueueSoft()
 	elseif event == "PLAYER_LOGIN" then
 		ResolveCharacter() -- the character name is certain by now
 		if root.dialogVolume ~= nil and C_CVar and C_CVar.SetCVar then
@@ -3138,15 +3367,22 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		RefreshControls()
 		ApplySettings()
 	elseif event == "PLAYER_SOFT_INTERACT_CHANGED" then
-		RefreshSoftObject()
+		QueueSoft()
 	elseif event == "CVAR_UPDATE" then
-		-- Another addon changed a cvar we need: take it back next frame (writes only on change,
-		-- so this can't loop).
-		if ObjectsOn() and type(arg1) == "string" and WATCHED_CVARS[arg1:lower()] then
-			C_Timer.After(0, function()
-				if ObjectsOn() then EnableObjectNameplates(); RefreshSoftObject() end
-			end)
-		end
+		-- Another addon changed a cvar we need: take it back next frame. Our own writes are
+		-- ignored, several changes at once make one re-apply, and after 20 re-applies within
+		-- 10 s we stop fighting (two addons undoing each other would loop forever).
+		if cvarGuard.writing or cvarGuard.queued or not ObjectsOn() then return end
+		if type(arg1) ~= "string" or not WATCHED_CVARS[arg1:lower()] then return end
+		local now = GetTime()
+		if now - cvarGuard.since > 10 then cvarGuard.since, cvarGuard.recent = now, 0 end
+		cvarGuard.recent = cvarGuard.recent + 1
+		if cvarGuard.recent > 20 then return end
+		cvarGuard.queued = true
+		C_Timer.After(0, function()
+			cvarGuard.queued = false
+			if ObjectsOn() then EnableObjectNameplates(); RefreshSoftObject() end
+		end)
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		inCombat = true
 		UpdateCombatAlpha()
@@ -3157,19 +3393,31 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		pendingCVars = nil
 		if pending == "apply" and ObjectsOn() then EnableObjectNameplates()
 		elseif pending == "restore" and not ObjectsOn() then RestoreObjectCVars() end
-		RefreshSoftObject()
-	else
-		RebuildQuestTitles(); RebuildObjectiveTexts()
-		RefreshAll()
+		RefreshAll() -- (also brings back icons hidden while fighting a mob that survived)
+	elseif event == "PLAYER_LEVEL_UP" then
+		-- Quests above you are now closer: restyle the icons for the level alert (a moment
+		-- later, so UnitLevel already reports the new level).
+		C_Timer.After(1, ApplyLook)
+	elseif event == "UNIT_THREAT_LIST_UPDATE" then
+		-- A mob started or stopped fighting you: hide or bring back its icon right away.
+		if db.hideWhileFighting and type(arg1) == "string" and arg1:find("^nameplate") then Refresh(arg1) end
+	elseif event == "PLAYER_ENTERING_WORLD" then
+		-- New zone or instance: rebuild now (instances switch every icon off).
+		FlushQuestLog()
+	elseif not later.questLog then -- QUEST_LOG_UPDATE, UNIT_QUEST_LOG_CHANGED
+		later.questLog = true
+		C_Timer.After(0.1, FlushQuestLog)
 	end
 end)
 
--- Light periodic recheck: objectives finish, tooltips load late, mobs die.
+-- Light periodic recheck: objectives finish, tooltips load late, mobs die. With the addon
+-- switched off there is nothing to check (one last pass clears what is left).
 local elapsed = 0
 events:SetScript("OnUpdate", function(_, dt)
 	elapsed = elapsed + dt
 	if elapsed < RECHECK_SECONDS or not db then return end
 	elapsed = 0
+	if not db.active and not next(icons) then return end
 	RefreshAll()
 end)
 
