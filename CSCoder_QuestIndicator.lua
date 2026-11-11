@@ -373,7 +373,8 @@ local objectiveTexts = {} -- { text = lower case objective, kind = quest kind }
 -- What the last quest log scan found: unfinished objectives per quest (the minimap tooltip
 -- summary) and when an objective last finished (icons that stop being needed right after show
 -- the check mark).
-local questLog = { summary = {}, completedAt = -100, byName = {} }
+-- scanned: per mob GUID, what the drawn tooltip showed (see IsQuestMob), until the log changes.
+local questLog = { summary = {}, completedAt = -100, byName = {}, scanned = {} }
 
 -- A name found in an unfinished objective ("Kobold Vermin slain: 3/10", "Crate of Supplies:
 -- 1/4"): its quest kind and progress.
@@ -475,10 +476,31 @@ local function IsQuestMob(unit)
 		if ok then related = value end
 	end
 	if Hidden.Value(related) then return Hidden.UNKNOWN end
-	if related == false then return false end
 	local state, title, progress = ByTooltipInfo(unit)
 	if state == Hidden.UNKNOWN then return Hidden.UNKNOWN end
+	-- The tooltip lists one of OUR open objectives: marked, whatever the API says. WoW Forever
+	-- answers "not related" for some mobs whose quest item is a drop (user's Strider young with
+	-- "Moa a quem moer - 0/5 Carne de Moa" in its tooltip, 2026-11-11), so the tooltip wins.
 	if state == true then return questLog.FromTitle(title, progress) end
+	if related == false then
+		-- On WoW Forever some mobs' quest lines are only in the DRAWN tooltip, not in its data
+		-- (the user's Strider young: "Moa a quem moer - 0/5 Carne de Moa" on screen, no icon).
+		-- Read a hidden drawn tooltip too, once per mob until the quest log changes (cheap).
+		if state == nil then
+			local guid = UnitGUID and UnitGUID(unit)
+			if Hidden.Value(guid) or type(guid) ~= "string" then guid = nil end
+			local cached = guid and questLog.scanned[guid]
+			if cached == nil then
+				local scanned, scannedTitle, scannedProgress = ByTooltipScan(unit)
+				if scanned == Hidden.UNKNOWN then return Hidden.UNKNOWN end
+				cached = scanned and { scannedTitle, scannedProgress } or false
+				if guid then questLog.scanned[guid] = cached end
+			end
+			if cached then return questLog.FromTitle(cached[1], cached[2]) end
+		end
+		-- Otherwise the game's "no" stands: nothing else (quest log names, Questie) overrules it.
+		return false
+	end
 	if related then
 		-- The tooltip shows nothing open, yet the game says the mob still matters: another quest
 		-- needs it without showing in the tooltip (often a drop). Its name in an unfinished
@@ -936,6 +958,7 @@ end
 function RebuildObjectiveTexts()
 	wipe(objectiveTexts)
 	wipe(questLog.byName)
+	wipe(questLog.scanned)
 	if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then return end
 	-- An objective that was unfinished on the last scan and is finished now plays the sound
 	-- (once per scan); a quest whose last objective just finished is announced as ready.
@@ -3701,6 +3724,33 @@ SlashCmdList.CSCODERQUESTINDICATOR = function(msg)
 		ShowNews()
 	elseif cmd == "debug" then
 		ShowDebug()
+	elseif cmd == "why" then
+		-- What the detection sees on the target: the game's answer, the tooltip data lines, the
+		-- drawn tooltip lines, and the result. For bug reports ("this mob has a quest, no icon").
+		local function Out(text) print("|cffffd200" .. TITLE .. "|r " .. text) end
+		if not UnitExists("target") then Out("target a mob first, then /cqi why") return end
+		local ok, related = pcall(C_QuestLog.UnitIsRelatedToActiveQuest, "target")
+		Out("related to a quest (game): " .. tostring(ok and related))
+		local data = C_TooltipInfo and C_TooltipInfo.GetUnit and C_TooltipInfo.GetUnit("target")
+		if Hidden.Table(data) and Hidden.Table(data.lines) then
+			for i, line in ipairs(data.lines) do
+				if Hidden.Table(line) then
+					Out(string.format("data %d: type %s, %s%s", i, tostring(line.type), tostring(line.leftText),
+						line.completed ~= nil and (" (completed " .. tostring(line.completed) .. ")") or ""))
+				else
+					Out("data " .. i .. ": hidden by the game")
+				end
+			end
+		else
+			Out("tooltip data: none or hidden")
+		end
+		scanner:SetOwner(WorldFrame, "ANCHOR_NONE"); scanner:ClearLines(); scanner:SetUnit("target")
+		for i = 2, scanner:NumLines() do
+			local fs = _G[ADDON .. "ScannerTextLeft" .. i]
+			Out("drawn " .. i .. ": " .. tostring(fs and fs:GetText()))
+		end
+		local needed, kind, progress = IsQuestMob("target")
+		Out(string.format("result: needed %s, kind %s, progress %s", tostring(needed), tostring(kind), tostring(progress)))
 	elseif cmd == "plate" then
 		-- Measures the target's nameplate for the preview and prints what was found.
 		-- Protected: an error here would leave the text stuck in the chat box.

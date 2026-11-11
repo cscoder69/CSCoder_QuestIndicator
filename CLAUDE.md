@@ -151,7 +151,9 @@ live in game after `/reload`. Second dev PC (notebook, set up 2026-11-11): sourc
   reads `QuestieTooltips.lookupByKey["m_"..npcId / "o_"..objectId]` (unfinished objectives of quests
   in our log, count from `Collected/Needed`). Asked only where the game leaves a gap: the game says
   related but the tooltip shows nothing open (after the quest-log name lookup), and the no-API /
-  no-tooltip fallbacks. A "no" from the game is never overruled. Only when Questie is LOADED (the
+  no-tooltip fallbacks. A "no" from the game is never overruled by Questie or the quest log — but the
+  mob's OWN tooltip listing one of our open objectives always wins (Forever says "not related" for
+  some drop mobs, e.g. the user's Strider young with "0/5 Carne de Moa", 2026-11-11). Only when Questie is LOADED (the
   user has it installed but disabled on their main character). Everything pcall'd; mock covers
   disabled / loaded / game's no / broken Questie.
 - **Hide while fighting it** (`hideWhileFighting`, OFF by default, user's request 2026-11-11): in
@@ -200,6 +202,9 @@ Settings) — the legacy fallbacks (IsAddOnLoaded, GetAddOnMetadata, GetQuestLog
 GetNumQuestLogEntries, InterfaceOptions_AddCategory) were removed. Globals written: only
 `CSCoderQuestIndicatorDB`, `SLASH_CSCODERQUESTINDICATOR1`, `CSCoderOptionsParent` (shared on purpose)
 and frames named `CSCoder_QuestIndicator*`. Check with `luajit -bl <file> | grep GSET`.
+Posted by the user (by hand) on **r/wowaddons** and **r/WowUI** on 2026-11-11 (v1.2.6), with the
+4 screenshots and the AI Disclaimer. Claude can't post: no Reddit access here, and Claude in Chrome
+has Reddit on its blocked list. Post text kept in the Desktop folder "CurseForge - galeria".
 
 ## Local checks (run before every hand-off)
 LuaJIT (Lua 5.1, same as WoW) is installed: `C:\Users\Claudio\AppData\Local\Programs\LuaJIT\bin\luajit.exe`.
@@ -254,6 +259,10 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
 - 1.2.6 (2026-11-11): modern APIs only (deprecated fallbacks removed for the Reddit code audit);
   README badges/screenshots, new CurseForge page. The CurseForge app had replaced the dev junction
   with its v1.2.5 copy after a power cut: keep this addon unmanaged in the app on dev PCs.
+  **Worse (found 2026-11-11):** when the app updates or uninstalls the addon it deletes files THROUGH
+  the junction, i.e. in the source folder (the icons folder vanished twice; the first time was blamed
+  on the power cut). The user removed the addon from the CurseForge app on this PC. If it happens
+  again: `git checkout -- icons` and recreate the junction.
 
 ## Quest pickup / Gameplay tab (released in v1.2.5; turn-in confirmed in game, button position not yet)
 - Third tab **Gameplay** (Settings | Gameplay | Profiles; built inline in the `builders` list —

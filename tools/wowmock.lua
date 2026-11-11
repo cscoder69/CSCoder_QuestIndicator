@@ -337,6 +337,28 @@ do
 	env.C_QuestLog.UnitIsRelatedToActiveQuest = function() return false end
 	local shownNo = PlateCount()
 	print("questie: game's no wins", not shownNo)
+	-- The game says "not related" but the tooltip lists our open objective (a drop: the user's
+	-- Strider young, "0/5 Carne de Moa"): the tooltip wins, the mob is marked with its count.
+	local savedTooltip = env.C_TooltipInfo
+	env.C_TooltipInfo = { GetUnit = function()
+		return { lines = { { type = 17, leftText = "Quest B" }, { type = 8, leftText = "Moa Meat: 0/5", completed = false } } }
+	end }
+	local shownDrop, countDrop = PlateCount()
+	print("quest: API says no, tooltip shows an open objective -> marked", shownDrop and countDrop)
+	-- Same, but the quest lines are only in the DRAWN tooltip, not in its data (what the user's
+	-- Strider young does in game): the hidden scanner tooltip finds them.
+	env.C_TooltipInfo = { GetUnit = function() return { lines = { { type = 0, leftText = "Strider young" } } } end }
+	local scannerFrame = rawget(env, "CSCoder_QuestIndicatorScanner")
+	local drawn = { "Level 13 Beast", "Quest B", " - Moa Meat: 0/5" }
+	rawset(scannerFrame, "NumLines", function() return #drawn + 1 end)
+	-- (the addon looks them up through _G, which in this mock is the real global table)
+	for i, text in ipairs(drawn) do _G["CSCoder_QuestIndicatorScannerTextLeft" .. (i + 1)] = { GetText = function() return text end } end
+	try("drawn-only log", eventFrame._scripts.OnEvent, eventFrame, "QUEST_LOG_UPDATE")
+	local shownDrawn, countDrawn = PlateCount()
+	print("quest: API says no, quest only in the drawn tooltip -> marked", shownDrawn and countDrawn)
+	rawset(scannerFrame, "NumLines", nil)
+	for i = 2, #drawn + 1 do _G["CSCoder_QuestIndicatorScannerTextLeft" .. i] = nil end
+	env.C_TooltipInfo = savedTooltip
 	env.C_QuestLog.UnitIsRelatedToActiveQuest = function() return true end
 	-- A broken Questie (odd entries, an Update that errors) must not break anything.
 	fakeQuestie.lookupByKey.m_123 = { odd = "text", ["202 1"] = { questId = 202, objective = {
