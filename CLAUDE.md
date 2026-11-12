@@ -1,6 +1,6 @@
 # CS.Coder - Quest Indicator — notes for Claude (and any dev)
 
-Read this first when working on the addon. Last updated 2026-11-11 (v1.2.6 published).
+Read this first when working on the addon. Last updated 2026-11-11 (v1.2.7 published).
 
 ## Working with the user
 - Chat in **Brazilian Portuguese**; code, comments, commits, docs and in-game text in **English**.
@@ -256,6 +256,8 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
   party-objective and secret-value fixes, event batching and other performance work.
 - 1.2.5 (2026-11-11): Gameplay tab: quest pickup (auto / button on lists, single quest at once),
   auto turn-in (rewards to choose left alone), Shift = manual, never interferes with other addons.
+- 1.2.7 (2026-11-11): the mob's own tooltip wins over the game's "not related" (drop mobs), drawn-
+  tooltip fallback cached per GUID, /cqi why.
 - 1.2.6 (2026-11-11): modern APIs only (deprecated fallbacks removed for the Reddit code audit);
   README badges/screenshots, new CurseForge page. The CurseForge app had replaced the dev junction
   with its v1.2.5 copy after a power cut: keep this addon unmanaged in the app on dev PCs.

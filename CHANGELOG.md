@@ -1,5 +1,10 @@
 # CS.Coder - Quest Indicator
 
+## v1.2.7
+
+- **Fix:** some mobs whose quest item is a drop showed no icon even though their tooltip listed your quest (for example a Strider young with "0/5 Moa Meat"). The game sometimes says these mobs aren't related to any quest; now the mob's own tooltip wins, including quest lines that only show in the tooltip on screen.
+- New **/cqi why**: target a mob and see what the addon detects (helps with bug reports).
+
 ## v1.2.6
 
 - Cleaner code: the addon now uses only the game's modern functions (no deprecated API left) and creates no unnecessary global variables.

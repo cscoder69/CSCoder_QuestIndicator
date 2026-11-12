@@ -1405,3 +1405,16 @@ local news126 = {
 for code, text in pairs(news126) do
 	locales[code].NEWS_TEXT = locales[code].NEWS_TEXT .. "\n" .. B .. text
 end
+
+-- What's new 1.2.7: the drop-mob fix, first in the list.
+local news127 = {
+	enUS = "Fix: mobs whose quest item is a drop now get their icon when their tooltip lists your quest.",
+	ptBR = "Correção: mobs que dropam item de missão agora ganham o ícone quando o tooltip deles mostra a sua missão.",
+	esES = "Corrección: los enemigos que sueltan un objeto de misión ahora muestran su icono cuando su descripción indica tu misión.",
+	deDE = "Korrektur: Gegner, die einen Questgegenstand fallen lassen, bekommen jetzt ihr Symbol, wenn ihr Tooltip deine Quest zeigt.",
+	frFR = "Correction : les monstres qui laissent un objet de quête ont maintenant leur icône quand leur infobulle indique votre quête.",
+	itIT = "Correzione: i nemici che lasciano un oggetto delle missioni ora mostrano l'icona quando il loro tooltip indica la tua missione.",
+}
+for code, text in pairs(news127) do
+	locales[code].NEWS_TEXT = B .. text .. "\n" .. locales[code].NEWS_TEXT
+end
