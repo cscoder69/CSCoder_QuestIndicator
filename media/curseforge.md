@@ -26,7 +26,6 @@ A floating "!" over every quest mob and item you still need, with live progress 
 
 - **Quest mobs and quest items** marked on their nameplates, with the objective count next to the icon.
 - **Level alert**: the icon turns red for quests above your level, deeper red the higher they are.
-- **Quest pickup and auto turn-in** (optional, Gameplay tab): accept every quest an NPC offers automatically or with one **Accept all** button, and hand in finished quests. Rewards you must choose are always left to you, and **Shift** makes any talk manual.
 - **37+ icons** in three categories (Standard, Themed, States), picked from a visual icon window.
 - **A setup guide** on first login: start with the defaults, or choose your icon, size and position with a live preview.
 - **Its own options window**, clean dark and gold: switches, sliders with typed values, menus and a live preview that matches your real nameplates.
@@ -64,7 +63,6 @@ A floating "!" over every quest mob and item you still need, with live progress 
 - Made for **WoW Forever**.
 - Not in dungeons and raids: the game locks nameplates and quest information there for every addon (Questie does the same). The icons come back as soon as you leave.
 - Quest items use the game's interact soft target, so the nearest item in front of you shows the icon.
-- Quest pickup and turn-in stay out of the way of any other addon that already does them (Questie, Leatrix Plus, QuickQuest, AutoTurnIn).
 - Works alongside ForeverLootSparkles.
 
 Found a bug or have an idea? Leave a comment or open an issue on [GitHub](https://github.com/cscoder69/CSCoder_QuestIndicator/issues).

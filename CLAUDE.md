@@ -266,33 +266,11 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
   on the power cut). The user removed the addon from the CurseForge app on this PC. If it happens
   again: `git checkout -- icons` and recreate the junction.
 
-## Quest pickup / Gameplay tab (released in v1.2.5; turn-in confirmed in game, button position not yet)
-- Third tab **Gameplay** (Settings | Gameplay | Profiles; built inline in the `builders` list —
-  a named local there would cross the 200-locals limit). Settings: `questPickup` (off),
-  `questPickupMode` "auto" | "button", `questPickupRepeatable` (on). Also on the setup guide's
-  Extras page (switch + mode). Labels proposed by me, user said "depois ajustamos": Coleta de quests,
-  Modo (Automático ao falar / Botão na janela), Incluir diárias e repetíveis, button "Pegar todas".
-- Logic: own `do` block before the events section (own event frame). GOSSIP_SHOW / QUEST_GREETING
-  open the next wanted quest (`C_GossipInfo.SelectAvailableQuest` / `SelectAvailableQuest(i)`),
-  QUEST_DETAIL `AcceptQuest()`, the game reopens the window -> next. `tried` (10 s) stops loops on a
-  full log. Auto: Shift at the start of the talk = manual until the windows close (`paused`).
-  Button mode (user's spec 2026-11-11): a LIST gets the "Pegar todas" button; an NPC with a SINGLE
-  quest (QUEST_DETAIL with no list seen, `sawList`) is accepted at once; a quest the player picks
-  from a list is theirs. Shift = all manual; said in a visible line on the tab (`PICKUP_HOW`).
-  The button is a child of the NPC window and isn't gated on `IsShown()` (the window can open a
-  moment after GOSSIP_SHOW; that was why it didn't show in game the first time).
-  Button: `UIPanelButtonTemplate` at the TOPRIGHT of GossipFrame/QuestFrame (-32, -30) — position
-  NOT checked in game yet. Only NPC/object GUIDs (no player shares, no item quests).
-- **Auto turn-in** (`questTurnIn`, off, separate switch, Gameplay tab only — not in the guide):
-  finished quests first (`C_GossipInfo.GetActiveQuests` isComplete / `GetActiveTitle`),
-  QUEST_PROGRESS `CompleteQuest()` when `IsQuestCompletable()`, QUEST_COMPLETE `GetQuestReward(n)`
-  only with 0 or 1 reward; **2+ choices = do nothing** (user's rule). Questie itself doesn't pick a
-  "recommended" reward either (it skips when choices > 1), so there was nothing to learn there.
-- **Never interfere with other addons** (user's rule): `questLog.OtherPickupAddon(kind)` checks
-  Questie (`autoAccept.enabled` / `autocomplete`), Leatrix Plus (`LeaPlusDB.AutomateQuests == "On"`),
-  QuickQuest and AutoTurnIn (loaded = active), Zygor (setting names guessed). Only LOADED addons
-  count. When one does it, ours does nothing and the Gameplay tab shows an orange note.
-- Reference used: Questie's `Modules/Auto/AutoQuesting.lua` (works on this client).
+## Quest pickup / turn-in: REMOVED (2026-11-14, user's decision)
+The Gameplay tab (auto pickup, "Accept all" button, auto turn-in, released in v1.2.5) was removed for
+v1.2.8: this addon is ONLY about customising the quest indicators. Do not add gameplay automation
+back here (if wanted, it belongs in a separate addon). `FillDefaults` clears the old keys from saves.
+The code is in git history (v1.2.7) if a separate addon ever needs it.
 
 ## Ideas the user liked, not done yet
 - **From the Questie comparison (2026-11-11), not built yet:** icon by objective type (kill / loot /

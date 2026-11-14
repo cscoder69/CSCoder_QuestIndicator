@@ -1,5 +1,9 @@
 # CS.Coder - Quest Indicator
 
+## v1.2.8
+
+- **Removed:** quest pickup, auto turn-in and the Gameplay tab. The addon is about the quest icons only; your other options are kept.
+
 ## v1.2.7
 
 - **Fix:** some mobs whose quest item is a drop showed no icon even though their tooltip listed your quest (for example a Strider young with "0/5 Moa Meat"). The game sometimes says these mobs aren't related to any quest; now the mob's own tooltip wins, including quest lines that only show in the tooltip on screen.
