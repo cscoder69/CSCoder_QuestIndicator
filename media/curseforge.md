@@ -16,7 +16,7 @@ A floating "!" over every quest mob and item you still need, with live progress 
 
 ## Description (Markdown)
 
-![CS.Coder - Quest Indicator](https://raw.githubusercontent.com/cscoder69/CSCoder_QuestIndicator/main/media/logo.png?v=2)
+![CS.Coder - Quest Indicator](https://raw.githubusercontent.com/cscoder69/CSCoder_QuestIndicator/main/media/logo_2026.png)
 
 **Never hunt the wrong mob again.** A floating, animated **"!"** marks every mob you still need for an active quest, and the quest item lying nearest to you, with your progress (**8/12**) right beside it. When an objective is done, the icon turns into a green check mark and goes.
 
