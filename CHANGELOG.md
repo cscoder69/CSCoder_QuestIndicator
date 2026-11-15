@@ -1,5 +1,10 @@
 # CS.Coder - Quest Indicator
 
+## v1.2.9
+
+- **New minimap button:** a "CS" button shared by every CS.Coder addon. With only Quest Indicator it works as before (left-click options, right-click on/off); with more CS.Coder addons installed (such as Class Indicator) one button opens a small menu to pick which one to open.
+- New logo, in the setup guide too.
+
 ## v1.2.8
 
 - **Removed:** quest pickup, auto turn-in and the Gameplay tab. The addon is about the quest icons only; your other options are kept.

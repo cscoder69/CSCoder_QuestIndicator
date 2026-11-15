@@ -1359,3 +1359,16 @@ local news128 = {
 for code, text in pairs(news128) do
 	locales[code].NEWS_TEXT = B .. text .. "\n" .. locales[code].NEWS_TEXT
 end
+
+-- What's new 1.2.9: the shared CS.Coder minimap button and the new logo, first in the list.
+local news129 = {
+	enUS = "New |cffffd200CS|r minimap button, shared by every CS.Coder addon: with several installed (like Class Indicator), one button opens a menu to pick which one to open. Plus a new logo.",
+	ptBR = "Novo botão |cffffd200CS|r no minimapa, compartilhado por todos os addons da CS.Coder: com vários instalados (como o Class Indicator), um só botão abre um menu para escolher qual abrir. E um logo novo.",
+	esES = "Nuevo botón |cffffd200CS|r en el minimapa, compartido por todos los addons de CS.Coder: con varios instalados (como Class Indicator), un solo botón abre un menú para elegir cuál abrir. Y un logo nuevo.",
+	deDE = "Neuer |cffffd200CS|r-Knopf an der Minikarte, geteilt von allen CS.Coder-Addons: Sind mehrere installiert (wie Class Indicator), öffnet ein Knopf ein Menü zur Auswahl. Dazu ein neues Logo.",
+	frFR = "Nouveau bouton |cffffd200CS|r sur la minicarte, partagé par tous les addons CS.Coder : avec plusieurs installés (comme Class Indicator), un seul bouton ouvre un menu pour choisir lequel ouvrir. Et un nouveau logo.",
+	itIT = "Nuovo pulsante |cffffd200CS|r sulla minimappa, condiviso da tutti gli addon di CS.Coder: con più addon installati (come Class Indicator), un solo pulsante apre un menu per scegliere quale aprire. E un nuovo logo.",
+}
+for code, text in pairs(news129) do
+	locales[code].NEWS_TEXT = B .. text .. "\n" .. locales[code].NEWS_TEXT
+end

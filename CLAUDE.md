@@ -258,6 +258,7 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
   auto turn-in (rewards to choose left alone), Shift = manual, never interferes with other addons.
 - 1.2.7 (2026-11-11): the mob's own tooltip wins over the game's "not related" (drop mobs), drawn-
   tooltip fallback cached per GUID, /cqi why.
+- 1.2.9 (2026-11-15): shared CS.Coder minimap button (menu with each addon's icon), new logo.
 - 1.2.6 (2026-11-11): modern APIs only (deprecated fallbacks removed for the Reddit code audit);
   README badges/screenshots, new CurseForge page. The CurseForge app had replaced the dev junction
   with its v1.2.5 copy after a power cut: keep this addon unmanaged in the app on dev PCs.
