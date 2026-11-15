@@ -6,5 +6,6 @@
 ## X-Curse-Project-ID: 1793185
 ## SavedVariables: CSCoderQuestIndicatorDB
 
+CSCoderMinimap.lua
 Locales.lua
 CSCoder_QuestIndicator.lua

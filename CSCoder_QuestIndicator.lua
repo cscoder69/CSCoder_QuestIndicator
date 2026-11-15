@@ -2036,94 +2036,41 @@ end)
 -- Minimap button
 ---------------------------------------------------------------------------------------------
 
-local minimapButton
 local OpenPanel -- defined below
 
-local function PlaceMinimapButton()
-	local angle = math.rad(db.minimapAngle or DEFAULTS.minimapAngle)
-	local radius = (Minimap:GetWidth() / 2) + 6
-	minimapButton:ClearAllPoints()
-	minimapButton:SetPoint("CENTER", Minimap, "CENTER", math.cos(angle) * radius, math.sin(angle) * radius)
-end
-
-local function CreateMinimapButton()
-	local b = CreateFrame("Button", ADDON .. "MinimapButton", Minimap)
-	b:SetSize(31, 31)
-	b:SetFrameStrata("MEDIUM")
-	b:SetFrameLevel(8)
-	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	b:RegisterForDrag("LeftButton")
-	b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-
-	local bg = b:CreateTexture(nil, "BACKGROUND")
-	bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-	bg:SetSize(20, 20)
-	bg:SetPoint("TOPLEFT", 7, -5)
-	local icon = b:CreateTexture(nil, "ARTWORK")
-	icon:SetTexture(IconPath(DEFAULT_STYLE))
-	icon:SetSize(17, 17)
-	icon:SetPoint("TOPLEFT", 7, -6)
-	b.icon = icon
-	local border = b:CreateTexture(nil, "OVERLAY")
-	border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-	border:SetSize(53, 53)
-	border:SetPoint("TOPLEFT")
-
-	b:SetScript("OnClick", function(_, button)
-		if button == "RightButton" then
+-- The minimap button is the shared CS.Coder one (CSCoderMinimap.lua, same file in every
+-- CS.Coder addon): one "CS" button; with several CS.Coder addons a click opens a menu to pick.
+function UpdateMinimapButton()
+	if not (db and Minimap and CSCoderMinimap) then return end
+	CSCoderMinimap.Register({
+		name = SUBTITLE,
+		open = function() OpenPanel(true) end,
+		rightClick = function()
 			db.active = not db.active
 			ApplySettings()
 			RefreshControls()
 			print("|cffffd200" .. TITLE .. "|r " .. (db.active and L.ON or L.OFF))
-		else
-			OpenPanel(true)
-		end
-	end)
-	b:SetScript("OnDragStart", function(self)
-		self:SetScript("OnUpdate", function()
-			local mx, my = Minimap:GetCenter()
-			local cx, cy = GetCursorPosition()
-			local scale = Minimap:GetEffectiveScale()
-			db.minimapAngle = math.deg(math.atan2(cy / scale - my, cx / scale - mx))
-			PlaceMinimapButton()
-		end)
-	end)
-	b:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
-	b:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-		GameTooltip:SetText(TITLE)
-		GameTooltip:AddLine(L.TIP_LEFT, 1, 1, 1)
-		GameTooltip:AddLine(L.TIP_RIGHT, 1, 1, 1)
-		GameTooltip:AddLine(L.TIP_DRAG, 0.7, 0.7, 0.7)
+		end,
+		leftHint = L.TIP_LEFT, rightHint = L.TIP_RIGHT, dragHint = L.TIP_DRAG,
 		-- What's left, per quest (up to 8 quests).
-		if db.minimapSummary and #questLog.summary > 0 then
-			GameTooltip:AddLine(" ")
-			GameTooltip:AddLine(L.SUMMARY_TITLE, 1, 0.82, 0)
+		tooltip = function(tooltip)
+			if not (db.minimapSummary and #questLog.summary > 0) then return end
+			tooltip:AddLine(" ")
+			tooltip:AddLine(L.SUMMARY_TITLE, 1, 0.82, 0)
 			for i, quest in ipairs(questLog.summary) do
 				if i > 8 then
-					GameTooltip:AddLine(string.format(L.SUMMARY_MORE, #questLog.summary - 8), 0.7, 0.7, 0.7)
+					tooltip:AddLine(string.format(L.SUMMARY_MORE, #questLog.summary - 8), 0.7, 0.7, 0.7)
 					break
 				end
-				GameTooltip:AddLine(quest.title, 1, 0.82, 0)
-				for _, line in ipairs(quest.lines) do GameTooltip:AddLine("   " .. line, 1, 1, 1) end
+				tooltip:AddLine(quest.title, 1, 0.82, 0)
+				for _, line in ipairs(quest.lines) do tooltip:AddLine("   " .. line, 1, 1, 1) end
 			end
-		end
-		GameTooltip:Show()
-	end)
-	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	return b
-end
-
-function UpdateMinimapButton()
-	if not (db and Minimap) then return end
-	if db.minimap then
-		minimapButton = minimapButton or CreateMinimapButton()
-		minimapButton.icon:SetDesaturated(not db.active)
-		PlaceMinimapButton()
-		minimapButton:Show()
-	elseif minimapButton then
-		minimapButton:Hide()
-	end
+		end,
+		shown = function() return db.minimap end,
+		active = function() return db.active end,
+		getAngle = function() return db.minimapAngle end,
+		setAngle = function(angle) db.minimapAngle = angle end,
+	})
 end
 
 local BuildPanel, ShowWizard, ShowNews, ShowDebug

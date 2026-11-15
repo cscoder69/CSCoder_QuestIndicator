@@ -23,7 +23,7 @@ jobs:
 
       - name: Syntax
         run: |
-          for f in Locales.lua CSCoder_QuestIndicator.lua; do
+          for f in CSCoderMinimap.lua Locales.lua CSCoder_QuestIndicator.lua; do
             luajit -e "assert(loadfile('$f'))" && echo "$f OK"
           done
 

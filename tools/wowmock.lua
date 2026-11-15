@@ -93,7 +93,7 @@ local fakeLSM = { List = function() return fakeFonts end, Fetch = function(_, _,
 rawset(_G, "LibStub", function(name) return name == "LibSharedMedia-3.0" and fakeLSM or nil end)
 
 local ns = {}
-for _, file in ipairs({ "Locales.lua", "CSCoder_QuestIndicator.lua" }) do
+for _, file in ipairs({ "CSCoderMinimap.lua", "Locales.lua", "CSCoder_QuestIndicator.lua" }) do
 	local chunk = assert(loadfile(dir .. "/" .. file))
 	setfenv(chunk, env)
 	chunk("CSCoder_QuestIndicator", ns)

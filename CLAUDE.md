@@ -87,7 +87,7 @@ live in game after `/reload`. Second dev PC (notebook, set up 2026-11-11): sourc
     checkbox never locks (it is how you turn the addon back on).
   - Dropdowns are self-made (UIDropDownMenu differs/deprecated across clients).
   - Static texts go through `Loc(object, key)` so a language change relabels live.
-- **Minimap button:** left-click options, right-click toggles `active`, drag around the edge; grey when off.
+- **Minimap button (shared since 2026-11-14):** `CSCoderMinimap.lua` (the SAME file in every CS.Coder addon, highest VERSION wins, global `CSCoderMinimap`): one "CS" button for all CS.Coder addons; one addon = left-click options, right-click toggles `active`; several = a menu to pick (right-click a row = its action). QI registers in `UpdateMinimapButton` (tooltip summary, angle in `db.minimapAngle`). Loaded first in the .toc, the mock and the CI syntax step.
 - **Setup guide** (`BuildWizard`, `ShowWizard`, `/cqi setup`): shown 3 s after login the first time on
   a character (`root.setupSeen[charKey]`; chars from before it existed are marked seen on update).
   Page 1 = logo (`icons/logo.tga`, made by `tools/make_logo_tga.ps1`), greeting, "Use default
