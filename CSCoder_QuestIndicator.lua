@@ -2045,6 +2045,7 @@ function UpdateMinimapButton()
 	CSCoderMinimap.Register({
 		name = SUBTITLE,
 		open = function() OpenPanel(true) end,
+		icon = IconPath(DEFAULT_STYLE),
 		rightClick = function()
 			db.active = not db.active
 			ApplySettings()

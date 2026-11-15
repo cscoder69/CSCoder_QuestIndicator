@@ -5,6 +5,7 @@
 --
 -- CSCoderMinimap.Register({
 --   name = "Quest Indicator",          -- shown in the menu and the tooltip
+--   icon = "Interface\\...", iconCoords = { l, r, t, b }, -- optional: its icon in the menu
 --   open = function() end,             -- left-click (its options)
 --   rightClick = function() end,       -- optional: right-click (e.g. turn it on/off)
 --   leftHint = "...", rightHint = "...", dragHint = "...", -- optional tooltip hints (localized)
@@ -15,7 +16,7 @@
 -- })
 -- CSCoderMinimap.Update() refreshes it (after an option changes).
 
-local VERSION = 1
+local VERSION = 2
 local lib = _G.CSCoderMinimap
 if lib and (lib.version or 0) >= VERSION then return end
 lib = lib or {}
@@ -89,16 +90,23 @@ local function ShowMenu(anchor)
 			local hl = row:CreateTexture(nil, "HIGHLIGHT")
 			hl:SetAllPoints()
 			hl:SetColorTexture(1, 0.82, 0, 0.15)
+			row.icon = row:CreateTexture(nil, "ARTWORK")
+			row.icon:SetSize(16, 16)
+			row.icon:SetPoint("LEFT", 6, 0)
 			row.text = row:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-			row.text:SetPoint("LEFT", 8, 0)
+			row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
 			menu.rows[i] = row
 		end
 		row:SetPoint("TOPLEFT", 4, -26 - (i - 1) * 20)
 		row:SetPoint("RIGHT", -4, 0)
 		local on = not entry.active or entry.active()
 		row.text:SetText(entry.name)
+		row.icon:SetTexture(entry.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+		local c = entry.iconCoords
+		if c then row.icon:SetTexCoord(c[1], c[2], c[3], c[4]) else row.icon:SetTexCoord(0, 1, 0, 1) end
+		row.icon:SetDesaturated(not on)
 		row.text:SetTextColor(on and 1 or 0.55, on and 1 or 0.55, on and 1 or 0.55)
-		width = math.max(width, row.text:GetStringWidth() + 32)
+		width = math.max(width, row.text:GetStringWidth() + 54)
 		row:SetScript("OnClick", function(_, button)
 			HideMenu()
 			if button == "RightButton" and entry.rightClick then entry.rightClick() else entry.open() end
