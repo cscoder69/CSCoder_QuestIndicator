@@ -61,7 +61,7 @@ local DEFAULTS = {
 }
 -- Saved layout: CSCoderQuestIndicatorDB = { version, language, profiles = { name = settings },
 -- chars = { "Name - Realm" = profile name }, savedCVars }.
-local SETTINGS_VERSION = 5
+local SETTINGS_VERSION = 6
 
 -- The addon's version from the .toc (the packager fills it in; a dev copy shows "dev").
 local function AddonVersion()
@@ -1152,7 +1152,13 @@ local function ResolveCharacter()
 	charKey = (name or "?") .. " - " .. (realm or "?")
 	local profile = root.chars[charKey]
 	if not (profile and root.profiles[profile]) then
-		profile = root.profiles[DEFAULT_PROFILE] and DEFAULT_PROFILE or ProfileNames()[1]
+		-- Each character gets its own profile, named after it: a copy of "Default" when that
+		-- exists (saves from before 1.2.10, so the look carries over), else the default settings.
+		profile = charKey
+		if not root.profiles[profile] then
+			local base = root.profiles[DEFAULT_PROFILE]
+			root.profiles[profile] = FillDefaults(base and CopySettings(base) or {})
+		end
 		root.chars[charKey] = profile
 	end
 	db = root.profiles[profile]
@@ -1180,11 +1186,19 @@ local function LoadSavedVariables()
 		root.cursor = nil
 		root.profiles = { [DEFAULT_PROFILE] = profile }
 	end
-	if next(root.profiles) == nil then root.profiles[DEFAULT_PROFILE] = {} end
 	root.chars = root.chars or {}
 	root.language = root.language or "auto"
-	root.version = SETTINGS_VERSION
 	for _, profile in pairs(root.profiles) do FillDefaults(profile) end
+	if (root.version or 1) < 6 then
+		-- Up to version 5 every character shared "Default": each one gets its own copy of it.
+		for character, name in pairs(root.chars) do
+			if name == DEFAULT_PROFILE and root.profiles[name] and not root.profiles[character] then
+				root.profiles[character] = CopySettings(root.profiles[name])
+				root.chars[character] = character
+			end
+		end
+	end
+	root.version = SETTINGS_VERSION
 	ResolveCharacter()
 end
 
@@ -2336,7 +2350,7 @@ local function OtherProfiles()
 	return names
 end
 
--- Characters on a deleted profile fall back to "Default" (or the first one) on their next login.
+-- Characters on a deleted profile get their own profile back on their next login.
 local function DeleteProfile(name)
 	if not root.profiles[name] or name == ActiveProfileName() then return end
 	root.profiles[name] = nil

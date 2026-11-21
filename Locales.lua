@@ -1372,3 +1372,18 @@ local news129 = {
 for code, text in pairs(news129) do
 	locales[code].NEWS_TEXT = B .. text .. "\n" .. locales[code].NEWS_TEXT
 end
+
+-- What's new 1.2.10: each character has its own profile, first in the list.
+do
+	local news1210 = {
+		enUS = "Each character now has its own profile, named after it: changes on one no longer affect the others. Your current settings were copied to each character. To share settings again, pick the same profile under Profiles > Existing Profiles.",
+		ptBR = "Cada personagem agora tem o seu próprio perfil, com o nome dele: mudar um não afeta mais os outros. Suas configurações atuais foram copiadas para cada personagem. Para voltar a compartilhar, escolha o mesmo perfil em Perfis > Perfis existentes.",
+		esES = "Cada personaje tiene ahora su propio perfil, con su nombre: los cambios en uno ya no afectan a los demás. Tu configuración actual se copió a cada personaje. Para volver a compartirla, elige el mismo perfil en Perfiles > Perfiles existentes.",
+		deDE = "Jeder Charakter hat jetzt sein eigenes Profil mit seinem Namen: Änderungen an einem wirken sich nicht mehr auf die anderen aus. Deine aktuellen Einstellungen wurden für jeden Charakter kopiert. Um sie wieder zu teilen, wähle unter Profile > Vorhandene Profile dasselbe Profil.",
+		frFR = "Chaque personnage a maintenant son propre profil, à son nom : modifier l'un n'affecte plus les autres. Vos réglages actuels ont été copiés pour chaque personnage. Pour les partager à nouveau, choisissez le même profil dans Profils > Profils existants.",
+		itIT = "Ogni personaggio ora ha il proprio profilo, con il suo nome: le modifiche su uno non influiscono più sugli altri. Le impostazioni attuali sono state copiate su ogni personaggio. Per condividerle di nuovo, scegli lo stesso profilo in Profili > Profili esistenti.",
+	}
+	for code, text in pairs(news1210) do
+		locales[code].NEWS_TEXT = B .. text .. "\n" .. locales[code].NEWS_TEXT
+	end
+end

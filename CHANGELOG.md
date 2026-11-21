@@ -1,5 +1,9 @@
 # CS.Coder - Quest Indicator
 
+## v1.2.10
+
+- **Each character has its own profile**, named after it ("Name - Realm"): changes on one character no longer change the others. On update, every character that shared the "Default" profile gets its own copy of it, so nothing looks different. New characters start from "Default" when it exists, otherwise from the default settings. To share settings again, pick the same profile under Profiles > Existing Profiles.
+
 ## v1.2.9
 
 - **New minimap button:** a "CS" button shared by every CS.Coder addon. With only Quest Indicator it works as before (left-click options, right-click on/off); with more CS.Coder addons installed (such as Class Indicator) one button opens a small menu to pick which one to open.

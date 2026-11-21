@@ -33,6 +33,9 @@ jobs:
       - name: Mocked WoW run from old saved variables
         run: luajit tools/wowmock.lua . old
 
+      - name: Mocked WoW run from shared-profile saved variables
+        run: luajit tools/wowmock.lua . v5
+
       - name: Translations
         run: luajit tools/check_translations.lua .
 

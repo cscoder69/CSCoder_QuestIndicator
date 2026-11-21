@@ -37,7 +37,11 @@ live in game after `/reload`. Second dev PC (notebook, set up 2026-11-11): sourc
 ## Code map (CSCoder_QuestIndicator.lua)
 - **Settings:** `DEFAULTS` = per-profile settings. Saved layout:
   `CSCoderQuestIndicatorDB = { version, language, profiles = { name = settings }, chars = { "Name - Realm" = profile }, savedCVars }`.
-  `SETTINGS_VERSION` 5; older flat saves migrate into profile "Default". `db` = active profile, `root` = saved table.
+  `SETTINGS_VERSION` 6; older flat saves migrate into profile "Default".
+  **Each character has its own profile by default (since 1.2.10, user's request):** `ResolveCharacter`
+  gives a character with no valid profile one named after it (`charKey`), a copy of "Default" when that
+  exists, else DEFAULTS. The v5 -> v6 migration copied "Default" for every character mapped to it. A
+  deleted profile's characters get their own back on next login. Mock mode `v5` checks the migration. `db` = active profile, `root` = saved table.
   Main switches: `active` (whole addon), `enabled` (mobs), `objects` (items).
 - **Quest detection:** tooltip data (`C_TooltipInfo.GetUnit`, QuestObjective lines, `completed`) or a
   hidden scanner tooltip; `C_QuestLog.UnitIsRelatedToActiveQuest` when present. Quest kind
@@ -259,6 +263,7 @@ whether the mock is missing an API (e.g. it once returned nil for `GetHighlightT
 - 1.2.7 (2026-11-11): the mob's own tooltip wins over the game's "not related" (drop mobs), drawn-
   tooltip fallback cached per GUID, /cqi why.
 - 1.2.9 (2026-11-15): shared CS.Coder minimap button (menu with each addon's icon), new logo.
+- 1.2.10 (2026-11-20): each character gets its own profile by default (old shared "Default" copied per character).
 - 1.2.6 (2026-11-11): modern APIs only (deprecated fallbacks removed for the Reddit code audit);
   README badges/screenshots, new CurseForge page. The CurseForge app had replaced the dev junction
   with its v1.2.5 copy after a power cut: keep this addon unmanaged in the app on dev PCs.

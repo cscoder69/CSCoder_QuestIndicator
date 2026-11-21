@@ -85,6 +85,8 @@ env.SlashCmdList = {}
 -- Lua builtins the addon uses
 for _, k in ipairs({ "pairs", "ipairs", "type", "tostring", "tonumber", "table", "string", "math", "setmetatable", "pcall", "next", "select", "unpack" }) do rawset(env, k, _G[k]) end
 
+-- "v5": every character shared "Default" (before 1.2.10); each must get its own copy of it.
+if arg[2] == "v5" then env.CSCoderQuestIndicatorDB = { version = 5, profiles = { Default = { scale = 1.5 } }, chars = { ["Tester - Realm"] = "Default", ["Alt - Realm"] = "Default" }, setupSeen = { ["Tester - Realm"] = true } } end
 if arg[2] == "old" then env.CSCoderQuestIndicatorDB = { version = 4, scale = 2.0, offset = -12, style = "red", glow = true, savedCVars = { SoftTargetIconGameObject = "0" } } end
 -- A fake LibSharedMedia with 30 fonts (another addon's), to exercise the multi-column font menu.
 local fakeFonts = {}
@@ -108,6 +110,13 @@ local eventFrame
 for _, f in ipairs(frames) do if f._scripts.OnEvent then eventFrame = f end end
 try("ADDON_LOADED", eventFrame._scripts.OnEvent, eventFrame, "ADDON_LOADED", "CSCoder_QuestIndicator")
 try("PLAYER_LOGIN", eventFrame._scripts.OnEvent, eventFrame, "PLAYER_LOGIN")
+-- Each character has its own profile, named after it.
+if env.CSCoderQuestIndicatorDB.chars["Tester - Realm"] ~= "Tester - Realm" then errors[#errors + 1] = "character not on its own profile" end
+if arg[2] == "v5" then
+	local alt = env.CSCoderQuestIndicatorDB.profiles["Alt - Realm"]
+	if env.CSCoderQuestIndicatorDB.chars["Alt - Realm"] ~= "Alt - Realm" or not alt or alt.scale ~= 1.5 then errors[#errors + 1] = "v5 migration: Alt not on its own copy of Default" end
+	print("v5 migration: Alt ->", env.CSCoderQuestIndicatorDB.chars["Alt - Realm"], "scale", alt and alt.scale)
+end
 for _, ev in ipairs({ "QUEST_LOG_UPDATE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "CVAR_UPDATE", "PLAYER_SOFT_INTERACT_CHANGED" }) do
 	try(ev, eventFrame._scripts.OnEvent, eventFrame, ev, "SoftTargetInteract")
 end
